@@ -23,7 +23,113 @@ let calendarDropZone = null;
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    checkAuthStatus();
+});
+    
+// 检查用户认证状态
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/api/auth/check');
+        const data = await response.json();
+        
+        if (!data.authenticated) {
+            // 未登录，跳转到登录页面
+            window.location.href = '/login';
+            return;
+        }
+        
+        // 已登录，设置用户信息并初始化应用
+        currentUser = data.user;
+        updateUserDisplay();
+        await initializeApp();
+        
+    } catch (error) {
+        console.error('检查认证状态失败:', error);
+        // 出错时跳转到登录页面
+        window.location.href = '/login';
+    }
+}
+
+// 更新用户显示信息
+function updateUserDisplay() {
+    if (!currentUser) return;
+    
+    const userDisplayName = document.getElementById('userDisplayName');
+    const userEmail = document.getElementById('userEmail');
+    const userAvatar = document.getElementById('userAvatar');
+    
+    if (userDisplayName) {
+        userDisplayName.textContent = currentUser.full_name || currentUser.username;
+    }
+    
+    if (userEmail) {
+        userEmail.textContent = currentUser.email;
+    }
+    
+    if (userAvatar) {
+        // 如果有头像URL，使用头像；否则显示用户名首字母
+        if (currentUser.avatar_url) {
+            userAvatar.innerHTML = `<img src="${currentUser.avatar_url}" alt="用户头像" style="width: 20px; height: 20px; border-radius: 50%;">`;
+        } else {
+            const firstLetter = (currentUser.username || 'U').charAt(0).toUpperCase();
+            userAvatar.innerHTML = `<span style="display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; background: var(--windows-blue); color: white; border-radius: 50%; font-size: 12px; font-weight: bold;">${firstLetter}</span>`;
+        }
+    }
+}
+
+// 切换用户菜单
+function toggleUserMenu() {
+    const userMenu = document.getElementById('userMenu');
+    if (userMenu) {
+        userMenu.classList.toggle('hidden');
+    }
+}
+
+// 显示用户资料
+function showUserProfile() {
+    toggleUserMenu();
+    showNotification('用户资料功能开发中...', 'info');
+}
+
+// 显示用户设置
+function showUserSettings() {
+    toggleUserMenu();
+    showNotification('用户设置功能开发中...', 'info');
+}
+
+// 用户登出
+async function logout() {
+    if (!confirm('确定要退出登录吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/auth/logout', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showNotification('已成功退出登录');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 1000);
+        } else {
+            throw new Error('退出登录失败');
+        }
+    } catch (error) {
+        console.error('退出登录失败:', error);
+        showNotification('退出登录失败，请重试', 'error');
+    }
+}
+
+// 点击外部关闭用户菜单
+document.addEventListener('click', function(event) {
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenu = document.getElementById('userMenu');
+    
+    if (userMenu && !userMenuBtn.contains(event.target) && !userMenu.contains(event.target)) {
+        userMenu.classList.add('hidden');
+    }
 });
     
 // 初始化应用
@@ -354,6 +460,12 @@ function createTaskItem(task) {
                             <span>${dueDateText}</span>
                         </div>
                     ` : ''}
+                    ${task.start_time ? `
+                        <div class="task-meta-item">
+                            <i class="fas fa-clock"></i>
+                            <span>${task.start_time}${task.end_time ? ' - ' + task.end_time : ''}</span>
+                        </div>
+                    ` : ''}
                     ${task.is_important ? `
                         <div class="task-meta-item important">
                             <i class="fas fa-star"></i>
@@ -530,6 +642,8 @@ async function editTask(taskId) {
         document.getElementById('taskDescription').value = task.description || '';
         document.getElementById('taskPriority').value = task.priority;
         document.getElementById('taskDueDate').value = task.due_date || '';
+        document.getElementById('taskStartTime').value = task.start_time || '';
+        document.getElementById('taskEndTime').value = task.end_time || '';
         document.getElementById('taskImportant').checked = task.is_important;
         
         loadTaskListOptions(task.list_id);
@@ -592,6 +706,8 @@ async function saveTask(event) {
         description: document.getElementById('taskDescription').value.trim(),
         priority: document.getElementById('taskPriority').value,
         due_date: document.getElementById('taskDueDate').value,
+        start_time: document.getElementById('taskStartTime').value,
+        end_time: document.getElementById('taskEndTime').value,
         list_id: parseInt(document.getElementById('taskListId').value),
         is_important: document.getElementById('taskImportant').checked
     };
@@ -945,21 +1061,42 @@ async function saveNewList(event) {
     }
 }
 
-// 切换更多菜单
+// 切换更多菜单 - 改为滑动式侧边栏
 function toggleMoreMenu() {
-    const moreMenu = document.getElementById('moreMenu');
+    const sidebar = document.getElementById('slidingSidebar');
+    const overlay = document.getElementById('slidingSidebarOverlay');
     const moreBtn = document.getElementById('moreBtn');
     
-    moreMenuOpen = !moreMenuOpen;
-    
-    if (moreMenuOpen) {
-        moreMenu.classList.add('show');
+    if (sidebar.classList.contains('show')) {
+        // 关闭侧边栏
+        sidebar.classList.remove('show');
+        overlay.classList.remove('show');
         moreBtn.style.background = 'var(--windows-blue)';
         moreBtn.style.color = 'white';
+        
+        // 重置动画
+        setTimeout(() => {
+            const sections = sidebar.querySelectorAll('.sidebar-section');
+            sections.forEach((section, index) => {
+                section.style.animation = 'none';
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(20px)';
+            });
+        }, 300);
     } else {
-        moreMenu.classList.remove('show');
+        // 打开侧边栏
+        sidebar.classList.add('show');
+        overlay.classList.add('show');
         moreBtn.style.background = 'var(--windows-surface)';
         moreBtn.style.color = 'var(--windows-text)';
+        
+        // 触发渐进式动画
+        setTimeout(() => {
+            const sections = sidebar.querySelectorAll('.sidebar-section');
+            sections.forEach((section, index) => {
+                section.style.animation = `fadeInSection 0.5s ease-out ${0.1 + index * 0.1}s both`;
+            });
+        }, 100);
     }
 }
 
@@ -991,23 +1128,23 @@ function handleMoreAction(action) {
     }
 }
 
-// 点击外部关闭更多菜单
+// 点击外部关闭滑动侧边栏
 document.addEventListener('click', function(event) {
+    const sidebar = document.getElementById('slidingSidebar');
+    const overlay = document.getElementById('slidingSidebarOverlay');
     const moreBtn = document.getElementById('moreBtn');
-    const moreMenu = document.getElementById('moreMenu');
-    const actionButtonsContainer = document.getElementById('actionButtonsContainer');
     
-    // 如果点击的不是更多按钮或菜单内部，且不在按钮容器内，则关闭菜单
-    if (moreMenuOpen && 
-        !moreBtn.contains(event.target) && 
-        !moreMenu.contains(event.target) &&
-        !actionButtonsContainer.contains(event.target)) {
+    // 如果侧边栏是打开的，且点击的不是侧边栏内部、更多按钮或遮罩层，则关闭
+    if (sidebar && sidebar.classList.contains('show') && 
+        !sidebar.contains(event.target) && 
+        !moreBtn.contains(event.target) &&
+        !overlay.contains(event.target)) {
         toggleMoreMenu();
     }
 });
 
-// 防止菜单内部点击事件冒泡
-document.getElementById('moreMenu').addEventListener('click', function(event) {
+// 防止侧边栏内部点击事件冒泡
+document.getElementById('slidingSidebar').addEventListener('click', function(event) {
     event.stopPropagation();
 });
 

@@ -1,14 +1,87 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_cors import CORS
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import sqlite3
 import json
 import requests
 import os
+import bcrypt
+import secrets
 from datetime import datetime, date, timedelta
 from database import init_database, insert_default_data, migrate_database
 
 app = Flask(__name__)
+app.secret_key = secrets.token_hex(32)  # 生成安全的密钥
 CORS(app)
+
+# 配置Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login_page'
+login_manager.login_message = '请先登录以访问此页面'
+login_manager.login_message_category = 'info'
+
+# 用户模型类
+class User(UserMixin):
+    def __init__(self, user_data):
+        self._id = str(user_data['id'])
+        self._username = user_data['username']
+        self._email = user_data['email']
+        self._full_name = user_data['full_name'] if user_data['full_name'] else ''
+        self._avatar_url = user_data['avatar_url'] if user_data['avatar_url'] else ''
+        self._is_active = bool(user_data['is_active']) if user_data['is_active'] is not None else True
+        self._email_verified = bool(user_data['email_verified']) if user_data['email_verified'] is not None else False
+        self._created_at = user_data['created_at'] if user_data['created_at'] else ''
+        self._last_login = user_data['last_login'] if user_data['last_login'] else ''
+    
+    @property
+    def id(self):
+        return self._id
+    
+    @property
+    def username(self):
+        return self._username
+    
+    @property
+    def email(self):
+        return self._email
+    
+    @property
+    def full_name(self):
+        return self._full_name
+    
+    @property
+    def avatar_url(self):
+        return self._avatar_url
+    
+    @property
+    def is_active(self):
+        return self._is_active
+    
+    @property
+    def email_verified(self):
+        return self._email_verified
+    
+    @property
+    def created_at(self):
+        return self._created_at
+    
+    @property
+    def last_login(self):
+        return self._last_login
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Flask-Login用户加载器"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE id = ? AND is_active = 1', (user_id,))
+    user_data = cursor.fetchone()
+    conn.close()
+    
+    if user_data:
+        return User(user_data)
+    return None
 
 # 初始化数据库
 init_database()
@@ -21,18 +94,26 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def get_current_user_id():
+    """获取当前登录用户的ID"""
+    if current_user.is_authenticated:
+        return int(current_user.id)
+    return None
+
 @app.route('/')
 def index():
     """主页面"""
     return render_template('index.html')
 
 @app.route('/api/task_lists')
+@login_required
 def get_task_lists():
-    """获取所有任务列表"""
+    """获取当前用户的任务列表"""
+    user_id = get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 一次性获取所有任务列表及其统计信息
+    # 一次性获取当前用户任务列表及其统计信息
     cursor.execute('''
         SELECT 
             tl.id, tl.name, tl.icon, tl.color, tl.sort_order,
@@ -40,9 +121,10 @@ def get_task_lists():
             COUNT(CASE WHEN t.completed = 1 THEN 1 END) as completed_tasks
         FROM task_lists tl
         LEFT JOIN tasks t ON tl.id = t.list_id
+        WHERE tl.user_id = ?
         GROUP BY tl.id, tl.name, tl.icon, tl.color, tl.sort_order
         ORDER BY tl.sort_order
-    ''')
+    ''', (user_id,))
     
     lists = cursor.fetchall()
     conn.close()
@@ -62,8 +144,10 @@ def get_task_lists():
     return jsonify(result)
 
 @app.route('/api/tasks')
+@login_required
 def get_tasks():
-    """获取任务列表"""
+    """获取当前用户的任务列表"""
+    user_id = get_current_user_id()
     list_id = request.args.get('list_id')
     show_completed = request.args.get('show_completed', 'true').lower() == 'true'
     
@@ -74,19 +158,20 @@ def get_tasks():
         # 获取特定列表的任务
         query = '''
             SELECT id, title, description, completed, priority, due_date, 
-                   list_id, created_at, updated_at, completed_at, is_important
+                   start_time, end_time, list_id, created_at, updated_at, completed_at, is_important
             FROM tasks 
-            WHERE list_id = ?
+            WHERE list_id = ? AND user_id = ?
         '''
-        params = [list_id]
+        params = [list_id, user_id]
     else:
-        # 获取所有任务
+        # 获取用户所有任务
         query = '''
             SELECT id, title, description, completed, priority, due_date, 
-                   list_id, created_at, updated_at, completed_at, is_important
+                   start_time, end_time, list_id, created_at, updated_at, completed_at, is_important
             FROM tasks
+            WHERE user_id = ?
         '''
-        params = []
+        params = [user_id]
     
     if not show_completed:
         query += ' AND completed = 0'
@@ -106,6 +191,8 @@ def get_tasks():
             'completed': bool(task['completed']),
             'priority': task['priority'],
             'due_date': task['due_date'],
+            'start_time': task['start_time'],
+            'end_time': task['end_time'],
             'list_id': task['list_id'],
             'created_at': task['created_at'],
             'updated_at': task['updated_at'],
@@ -116,18 +203,20 @@ def get_tasks():
     return jsonify(result)
 
 @app.route('/api/tasks/<int:task_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
 def handle_task(task_id):
     """处理单个任务的获取、更新和删除"""
+    user_id = get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
     
     if request.method == 'GET':
         cursor.execute('''
             SELECT id, title, description, completed, priority, due_date, 
-                   list_id, created_at, updated_at, completed_at, is_important
+                   start_time, end_time, list_id, created_at, updated_at, completed_at, is_important
             FROM tasks 
-            WHERE id = ?
-        ''', (task_id,))
+            WHERE id = ? AND user_id = ?
+        ''', (task_id, user_id))
         
         task = cursor.fetchone()
         conn.close()
@@ -140,6 +229,8 @@ def handle_task(task_id):
                 'completed': bool(task['completed']),
                 'priority': task['priority'],
                 'due_date': task['due_date'],
+                'start_time': task['start_time'],
+                'end_time': task['end_time'],
                 'list_id': task['list_id'],
                 'created_at': task['created_at'],
                 'updated_at': task['updated_at'],
@@ -156,7 +247,7 @@ def handle_task(task_id):
         update_fields = []
         update_values = []
         
-        for field in ['title', 'description', 'priority', 'due_date', 'list_id', 'is_important']:
+        for field in ['title', 'description', 'priority', 'due_date', 'start_time', 'end_time', 'list_id', 'is_important']:
             if field in data:
                 update_fields.append(f"{field} = ?")
                 update_values.append(data[field])
@@ -177,11 +268,12 @@ def handle_task(task_id):
         update_fields.append("updated_at = ?")
         update_values.append(datetime.now().isoformat())
         update_values.append(task_id)
+        update_values.append(user_id)
         
         cursor.execute(f'''
             UPDATE tasks 
             SET {', '.join(update_fields)}
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
         ''', update_values)
         
         conn.commit()
@@ -190,15 +282,17 @@ def handle_task(task_id):
         return jsonify({'success': True})
     
     elif request.method == 'DELETE':
-        cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+        cursor.execute('DELETE FROM tasks WHERE id = ? AND user_id = ?', (task_id, user_id))
         conn.commit()
         conn.close()
         
         return jsonify({'success': True})
 
 @app.route('/api/tasks', methods=['POST'])
+@login_required
 def create_task():
     """创建新任务"""
+    user_id = get_current_user_id()
     data = request.get_json()
     
     title = data.get('title', '').strip()
@@ -209,15 +303,18 @@ def create_task():
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO tasks (title, description, priority, due_date, list_id, is_important)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (title, description, priority, due_date, start_time, end_time, list_id, is_important, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         title,
         data.get('description', ''),
         data.get('priority', 'medium'),
         data.get('due_date'),
+        data.get('start_time'),
+        data.get('end_time'),
         data.get('list_id'),
-        data.get('is_important', False)
+        data.get('is_important', False),
+        user_id
     ))
     
     task_id = cursor.lastrowid
@@ -227,8 +324,10 @@ def create_task():
     return jsonify({'id': task_id, 'success': True})
 
 @app.route('/api/task_lists', methods=['POST'])
+@login_required
 def create_task_list():
     """创建新任务列表"""
+    user_id = get_current_user_id()
     data = request.get_json()
     
     name = data.get('name', '').strip()
@@ -238,18 +337,19 @@ def create_task_list():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 获取最大的排序顺序
-    cursor.execute('SELECT MAX(sort_order) as max_order FROM task_lists')
+    # 获取用户最大的排序顺序
+    cursor.execute('SELECT MAX(sort_order) as max_order FROM task_lists WHERE user_id = ?', (user_id,))
     max_order = cursor.fetchone()['max_order'] or 0
     
     cursor.execute('''
-        INSERT INTO task_lists (name, icon, color, sort_order)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO task_lists (name, icon, color, sort_order, user_id)
+        VALUES (?, ?, ?, ?, ?)
     ''', (
         name,
         data.get('icon', '📋'),
         data.get('color', '#0078d4'),
-        max_order + 1
+        max_order + 1,
+        user_id
     ))
     
     list_id = cursor.lastrowid
@@ -259,8 +359,10 @@ def create_task_list():
     return jsonify({'id': list_id, 'success': True})
 
 @app.route('/api/task_lists/<int:list_id>', methods=['PUT', 'DELETE'])
+@login_required
 def handle_task_list(list_id):
     """处理任务列表的更新和删除"""
+    user_id = get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -279,11 +381,12 @@ def handle_task_list(list_id):
             return jsonify({'error': '没有要更新的字段'}), 400
         
         update_values.append(list_id)
+        update_values.append(user_id)
         
         cursor.execute(f'''
             UPDATE task_lists 
             SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
         ''', update_values)
         
         conn.commit()
@@ -292,22 +395,24 @@ def handle_task_list(list_id):
         return jsonify({'success': True})
     
     elif request.method == 'DELETE':
-        # 删除列表及其所有任务
-        cursor.execute('DELETE FROM tasks WHERE list_id = ?', (list_id,))
-        cursor.execute('DELETE FROM task_lists WHERE id = ?', (list_id,))
+        # 删除列表及其所有任务（只删除当前用户的）
+        cursor.execute('DELETE FROM tasks WHERE list_id = ? AND user_id = ?', (list_id, user_id))
+        cursor.execute('DELETE FROM task_lists WHERE id = ? AND user_id = ?', (list_id, user_id))
         conn.commit()
         conn.close()
         
         return jsonify({'success': True})
 
 @app.route('/api/user_preferences', methods=['GET', 'PUT'])
+@login_required
 def handle_user_preferences():
-    """处理用户偏好设置"""
+    """处理当前用户偏好设置"""
+    user_id = get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
     
     if request.method == 'GET':
-        cursor.execute('SELECT * FROM user_preferences WHERE id = 1')
+        cursor.execute('SELECT * FROM user_preferences WHERE user_id = ?', (user_id,))
         prefs = cursor.fetchone()
         conn.close()
         
@@ -324,7 +429,26 @@ def handle_user_preferences():
                 'default_list_id': prefs['default_list_id']
             })
         else:
-            return jsonify({'error': '用户偏好不存在'}), 404
+            # 如果没有偏好设置，创建默认设置
+            cursor.execute('''
+                INSERT INTO user_preferences (user_id, theme, language, accent_color)
+                VALUES (?, 'light', 'zh-CN', '#0078d4')
+            ''', (user_id,))
+            conn.commit()
+            conn.close()
+            
+            # 返回默认设置
+            return jsonify({
+                'theme': 'light',
+                'language': 'zh-CN',
+                'accent_color': '#0078d4',
+                'font_size': 'medium',
+                'animations_enabled': True,
+                'transparency_enabled': True,
+                'view_mode': 'list',
+                'show_completed': True,
+                'default_list_id': None
+            })
     
     elif request.method == 'PUT':
         data = request.get_json()
@@ -343,12 +467,12 @@ def handle_user_preferences():
         if not update_fields:
             return jsonify({'error': '没有要更新的字段'}), 400
         
-        update_values.append(1)  # WHERE id = 1
+        update_values.append(user_id)
         
         cursor.execute(f'''
             UPDATE user_preferences 
             SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?
+            WHERE user_id = ?
         ''', update_values)
         
         conn.commit()
@@ -357,34 +481,36 @@ def handle_user_preferences():
         return jsonify({'success': True})
 
 @app.route('/api/stats')
+@login_required
 def get_stats():
-    """获取任务统计信息"""
+    """获取当前用户的任务统计信息"""
+    user_id = get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
     
     # 总任务数
-    cursor.execute('SELECT COUNT(*) as total FROM tasks')
+    cursor.execute('SELECT COUNT(*) as total FROM tasks WHERE user_id = ?', (user_id,))
     total_tasks = cursor.fetchone()['total']
     
     # 已完成任务数
-    cursor.execute('SELECT COUNT(*) as completed FROM tasks WHERE completed = 1')
+    cursor.execute('SELECT COUNT(*) as completed FROM tasks WHERE user_id = ? AND completed = 1', (user_id,))
     completed_tasks = cursor.fetchone()['completed']
     
     # 重要任务数
-    cursor.execute('SELECT COUNT(*) as important FROM tasks WHERE is_important = 1 AND completed = 0')
+    cursor.execute('SELECT COUNT(*) as important FROM tasks WHERE user_id = ? AND is_important = 1 AND completed = 0', (user_id,))
     important_tasks = cursor.fetchone()['important']
     
     # 今日到期任务数
     today = date.today().isoformat()
-    cursor.execute('SELECT COUNT(*) as today_due FROM tasks WHERE due_date = ? AND completed = 0', (today,))
+    cursor.execute('SELECT COUNT(*) as today_due FROM tasks WHERE user_id = ? AND due_date = ? AND completed = 0', (user_id, today))
     today_due_tasks = cursor.fetchone()['today_due']
     
     # 本周到期任务数
     cursor.execute('''
         SELECT COUNT(*) as week_due 
         FROM tasks 
-        WHERE due_date BETWEEN ? AND ? AND completed = 0
-    ''', (today, date.fromordinal(date.today().toordinal() + 7).isoformat()))
+        WHERE user_id = ? AND due_date BETWEEN ? AND ? AND completed = 0
+    ''', (user_id, today, date.fromordinal(date.today().toordinal() + 7).isoformat()))
     week_due_tasks = cursor.fetchone()['week_due']
     
     conn.close()
@@ -400,8 +526,10 @@ def get_stats():
     })
 
 @app.route('/api/search')
+@login_required
 def search_tasks():
-    """搜索任务"""
+    """搜索当前用户的任务"""
+    user_id = get_current_user_id()
     query = request.args.get('q', '').strip()
     
     if not query:
@@ -415,9 +543,9 @@ def search_tasks():
                t.due_date, t.list_id, tl.name as list_name, tl.icon as list_icon
         FROM tasks t
         LEFT JOIN task_lists tl ON t.list_id = tl.id
-        WHERE t.title LIKE ? OR t.description LIKE ?
+        WHERE t.user_id = ? AND (t.title LIKE ? OR t.description LIKE ?)
         ORDER BY t.is_important DESC, t.due_date ASC
-    ''', (f'%{query}%', f'%{query}%'))
+    ''', (user_id, f'%{query}%', f'%{query}%'))
     
     results = cursor.fetchall()
     conn.close()
@@ -440,8 +568,10 @@ def search_tasks():
 
 # 日历周视图相关API
 @app.route('/api/calendar/week')
+@login_required
 def get_calendar_week():
-    """获取周视图日历数据"""
+    """获取当前用户的周视图日历数据"""
+    user_id = get_current_user_id()
     try:
         # 获取查询参数
         week_start = request.args.get('week_start')
@@ -457,16 +587,16 @@ def get_calendar_week():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 获取指定周的任务
+        # 获取指定周的用户任务
         cursor.execute('''
             SELECT t.id, t.title, t.description, t.completed, t.priority,
                    t.due_date, t.start_time, t.end_time, t.list_id, t.is_important,
                    tl.name as list_name, tl.icon as list_icon, tl.color as list_color
             FROM tasks t
             LEFT JOIN task_lists tl ON t.list_id = tl.id
-            WHERE t.due_date BETWEEN ? AND ?
+            WHERE t.user_id = ? AND t.due_date BETWEEN ? AND ?
             ORDER BY t.due_date, t.start_time, t.is_important DESC
-        ''', (week_start_date.isoformat(), week_end_date.isoformat()))
+        ''', (user_id, week_start_date.isoformat(), week_end_date.isoformat()))
         
         tasks = cursor.fetchall()
         conn.close()
@@ -516,25 +646,28 @@ def get_calendar_week():
         return jsonify({'error': '获取周视图数据失败'}), 500
 
 @app.route('/api/tasks/<int:task_id>/time', methods=['PUT'])
+@login_required
 def update_task_time(task_id):
-    """更新任务时间"""
+    """更新当前用户的任务时间"""
+    user_id = get_current_user_id()
     try:
         data = request.get_json()
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 更新任务时间
+        # 更新用户任务时间
         cursor.execute('''
             UPDATE tasks 
             SET start_time = ?, end_time = ?, due_date = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
         ''', (
             data.get('start_time'),
             data.get('end_time'),
             data.get('due_date'),
             datetime.now().isoformat(),
-            task_id
+            task_id,
+            user_id
         ))
         
         conn.commit()
@@ -547,8 +680,10 @@ def update_task_time(task_id):
         return jsonify({'error': '更新任务时间失败'}), 500
 
 @app.route('/api/tasks/batch', methods=['POST'])
+@login_required
 def batch_update_tasks():
-    """批量更新任务"""
+    """批量更新当前用户的任务"""
+    user_id = get_current_user_id()
     try:
         data = request.get_json()
         updates = data.get('updates', [])
@@ -576,11 +711,12 @@ def batch_update_tasks():
                 update_fields.append("updated_at = ?")
                 update_values.append(datetime.now().isoformat())
                 update_values.append(task_id)
+                update_values.append(user_id)
                 
                 cursor.execute(f'''
                     UPDATE tasks 
                     SET {', '.join(update_fields)}
-                    WHERE id = ?
+                    WHERE id = ? AND user_id = ?
                 ''', update_values)
                 success_count += 1
         
@@ -930,6 +1066,16 @@ def execute_ai_action(action):
 def execute_create_task(data):
     """执行创建任务操作"""
     try:
+        # 获取当前用户ID
+        if current_user.is_authenticated:
+            user_id = int(current_user.id)
+        else:
+            return {
+                'success': False,
+                'error': '用户未登录',
+                'action': 'create_task'
+            }
+        
         title = data.get('title', '').strip()
         if not title:
             return {
@@ -945,33 +1091,42 @@ def execute_create_task(data):
         list_id = None
         list_name = data.get('list_name')
         if list_name:
-            cursor.execute('SELECT id FROM task_lists WHERE name = ?', (list_name,))
+            cursor.execute('SELECT id FROM task_lists WHERE name = ? AND user_id = ?', (list_name, user_id))
             result = cursor.fetchone()
             if result:
                 list_id = result['id']
             else:
                 # 创建新列表
                 cursor.execute('''
-                    INSERT INTO task_lists (name, icon, color, sort_order)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO task_lists (name, icon, color, sort_order, user_id)
+                    VALUES (?, ?, ?, ?, ?)
                 ''', (
                     list_name,
                     data.get('icon', '📋'),
                     data.get('color', '#0078d4'),
-                    999
+                    999,
+                    user_id
                 ))
                 list_id = cursor.lastrowid
         
-        # 如果没有指定列表，使用默认列表
+        # 如果没有指定列表，使用用户的默认列表
         if not list_id:
-            cursor.execute('SELECT id FROM task_lists ORDER BY sort_order LIMIT 1')
+            cursor.execute('SELECT id FROM task_lists WHERE user_id = ? ORDER BY sort_order LIMIT 1', (user_id,))
             result = cursor.fetchone()
-            list_id = result['id'] if result else 1
+            list_id = result['id'] if result else None
+        
+        # 如果仍然没有列表，创建一个默认列表
+        if not list_id:
+            cursor.execute('''
+                INSERT INTO task_lists (name, icon, color, sort_order, user_id)
+                VALUES (?, ?, ?, ?, ?)
+            ''', ('默认列表', '📋', '#0078d4', 0, user_id))
+            list_id = cursor.lastrowid
         
         # 创建任务
         cursor.execute('''
-            INSERT INTO tasks (title, description, priority, due_date, start_time, end_time, list_id, is_important)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tasks (title, description, priority, due_date, start_time, end_time, list_id, is_important, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             title,
             data.get('description', ''),
@@ -980,7 +1135,8 @@ def execute_create_task(data):
             data.get('start_time'),
             data.get('end_time'),
             list_id,
-            data.get('is_important', False)
+            data.get('is_important', False),
+            user_id
         ))
         
         task_id = cursor.lastrowid
@@ -1006,6 +1162,16 @@ def execute_create_task(data):
 def execute_create_list(data):
     """执行创建列表操作"""
     try:
+        # 获取当前用户ID
+        if current_user.is_authenticated:
+            user_id = int(current_user.id)
+        else:
+            return {
+                'success': False,
+                'error': '用户未登录',
+                'action': 'create_list'
+            }
+        
         name = data.get('name', '').strip()
         if not name:
             return {
@@ -1017,18 +1183,19 @@ def execute_create_list(data):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 获取最大的排序顺序
-        cursor.execute('SELECT MAX(sort_order) as max_order FROM task_lists')
+        # 获取用户最大的排序顺序
+        cursor.execute('SELECT MAX(sort_order) as max_order FROM task_lists WHERE user_id = ?', (user_id,))
         max_order = cursor.fetchone()['max_order'] or 0
         
         cursor.execute('''
-            INSERT INTO task_lists (name, icon, color, sort_order)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO task_lists (name, icon, color, sort_order, user_id)
+            VALUES (?, ?, ?, ?, ?)
         ''', (
             name,
             data.get('icon', '📋'),
             data.get('color', '#0078d4'),
-            max_order + 1
+            max_order + 1,
+            user_id
         ))
         
         list_id = cursor.lastrowid
@@ -1053,6 +1220,16 @@ def execute_create_list(data):
 def execute_update_task(data):
     """执行更新任务操作"""
     try:
+        # 获取当前用户ID
+        if current_user.is_authenticated:
+            user_id = int(current_user.id)
+        else:
+            return {
+                'success': False,
+                'error': '用户未登录',
+                'action': 'update_task'
+            }
+        
         task_id = data.get('task_id')
         if not task_id:
             return {
@@ -1093,11 +1270,12 @@ def execute_update_task(data):
         update_fields.append("updated_at = ?")
         update_values.append(datetime.now().isoformat())
         update_values.append(task_id)
+        update_values.append(user_id)
         
         cursor.execute(f'''
             UPDATE tasks 
             SET {', '.join(update_fields)}
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
         ''', update_values)
         
         conn.commit()
@@ -1120,6 +1298,16 @@ def execute_update_task(data):
 def execute_delete_task(data):
     """执行删除任务操作"""
     try:
+        # 获取当前用户ID
+        if current_user.is_authenticated:
+            user_id = int(current_user.id)
+        else:
+            return {
+                'success': False,
+                'error': '用户未登录',
+                'action': 'delete_task'
+            }
+        
         task_id = data.get('task_id')
         if not task_id:
             return {
@@ -1131,7 +1319,7 @@ def execute_delete_task(data):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+        cursor.execute('DELETE FROM tasks WHERE id = ? AND user_id = ?', (task_id, user_id))
         conn.commit()
         conn.close()
         
@@ -1152,6 +1340,16 @@ def execute_delete_task(data):
 def execute_search_tasks(data):
     """执行搜索任务操作"""
     try:
+        # 获取当前用户ID
+        if current_user.is_authenticated:
+            user_id = int(current_user.id)
+        else:
+            return {
+                'success': False,
+                'error': '用户未登录',
+                'action': 'search_tasks'
+            }
+        
         query = data.get('query', '').strip()
         if not query:
             return {
@@ -1168,9 +1366,9 @@ def execute_search_tasks(data):
                    t.due_date, t.list_id, tl.name as list_name, tl.icon as list_icon
             FROM tasks t
             LEFT JOIN task_lists tl ON t.list_id = tl.id
-            WHERE t.title LIKE ? OR t.description LIKE ?
+            WHERE t.user_id = ? AND (t.title LIKE ? OR t.description LIKE ?)
             ORDER BY t.is_important DESC, t.due_date ASC
-        ''', (f'%{query}%', f'%{query}%'))
+        ''', (user_id, f'%{query}%', f'%{query}%'))
         
         results = cursor.fetchall()
         conn.close()
@@ -1662,6 +1860,237 @@ def test_ai_connection():
             'success': False,
             'error': str(e)
         }), 500
+
+# 用户认证相关API
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """用户注册"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        full_name = data.get('full_name', '').strip()
+        
+        # 验证输入
+        if not username or not email or not password:
+            return jsonify({
+                'success': False,
+                'error': '用户名、邮箱和密码不能为空'
+            }), 400
+        
+        if len(username) < 3:
+            return jsonify({
+                'success': False,
+                'error': '用户名至少需要3个字符'
+            }), 400
+        
+        if len(password) < 6:
+            return jsonify({
+                'success': False,
+                'error': '密码至少需要6个字符'
+            }), 400
+        
+        # 验证邮箱格式
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return jsonify({
+                'success': False,
+                'error': '邮箱格式不正确'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查用户名和邮箱是否已存在
+        cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': '用户名或邮箱已存在'
+            }), 400
+        
+        # 哈希密码
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # 创建用户
+        cursor.execute('''
+            INSERT INTO users (username, email, password_hash, full_name)
+            VALUES (?, ?, ?, ?)
+        ''', (username, email, password_hash, full_name))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # 创建用户默认偏好设置
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO user_preferences (user_id, theme, language, accent_color)
+            VALUES (?, 'light', 'zh-CN', '#0078d4')
+        ''', (user_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '注册成功',
+            'user_id': user_id
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'注册失败: {str(e)}'
+        }), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """用户登录"""
+    try:
+        data = request.get_json()
+        username_or_email = data.get('username_or_email', '').strip()
+        password = data.get('password', '')
+        remember_me = data.get('remember_me', False)
+        
+        if not username_or_email or not password:
+            return jsonify({
+                'success': False,
+                'error': '用户名/邮箱和密码不能为空'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查找用户（支持用户名或邮箱登录）
+        cursor.execute('''
+            SELECT * FROM users 
+            WHERE (username = ? OR email = ?) AND is_active = 1
+        ''', (username_or_email, username_or_email))
+        
+        user_data = cursor.fetchone()
+        conn.close()
+        
+        if not user_data:
+            return jsonify({
+                'success': False,
+                'error': '用户名/邮箱或密码错误'
+            }), 401
+        
+        # 验证密码
+        if not bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
+            return jsonify({
+                'success': False,
+                'error': '用户名/邮箱或密码错误'
+            }), 401
+        
+        # 创建用户对象并登录
+        user = User(user_data)
+        login_user(user, remember=remember_me)
+        
+        # 更新最后登录时间
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users SET last_login = ? WHERE id = ?
+        ''', (datetime.now().isoformat(), user.id))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '登录成功',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'avatar_url': user.avatar_url
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'登录失败: {str(e)}'
+        }), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@login_required
+def logout():
+    """用户登出"""
+    try:
+        logout_user()
+        return jsonify({
+            'success': True,
+            'message': '已成功登出'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'登出失败: {str(e)}'
+        }), 500
+
+@app.route('/api/auth/me', methods=['GET'])
+@login_required
+def get_current_user():
+    """获取当前用户信息"""
+    return jsonify({
+        'success': True,
+        'user': {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email,
+            'full_name': current_user.full_name,
+            'avatar_url': current_user.avatar_url,
+            'email_verified': current_user.email_verified,
+            'created_at': current_user.created_at,
+            'last_login': current_user.last_login
+        }
+    })
+
+@app.route('/api/auth/check', methods=['GET'])
+def check_auth():
+    """检查认证状态"""
+    if current_user.is_authenticated:
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email,
+                'full_name': current_user.full_name,
+                'avatar_url': current_user.avatar_url
+            }
+        })
+    else:
+        return jsonify({
+            'authenticated': False
+        })
+
+# 登录和注册页面
+@app.route('/login')
+def login_page():
+    """登录页面"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+@app.route('/register')
+def register_page():
+    """注册页面"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout_page():
+    """登出页面"""
+    logout_user()
+    return redirect(url_for('login_page'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
