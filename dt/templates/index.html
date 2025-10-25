@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microsoft To Do</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Windows 11 风格的自定义样式 */
+        :root {
+            --windows-blue: #0078d4;
+            --windows-blue-hover: #106ebe;
+            --windows-bg: #f3f3f3;
+            --windows-surface: #ffffff;
+            --windows-border: #e1e1e1;
+            --windows-text: #323130;
+            --windows-text-secondary: #605e5c;
+        }
+
+        /* 深色主题变量 */
+        [data-theme="dark"] {
+            --windows-blue: #4080ff;
+            --windows-blue-hover: #5090ff;
+            --windows-bg: #202020;
+            --windows-surface: #2d2d2d;
+            --windows-border: #404040;
+            --windows-text: #ffffff;
+            --windows-text-secondary: #cccccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--windows-bg);
+            color: var(--windows-text);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .windows-card {
+            background: var(--windows-surface);
+            border: 1px solid var(--windows-border);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .windows-button {
+            background: var(--windows-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .windows-button:hover {
+            background: var(--windows-blue-hover);
+        }
+
+        .windows-button-secondary {
+            background: transparent;
+            color: var(--windows-text);
+            border: 1px solid var(--windows-border);
+        }
+
+        .windows-button-secondary:hover {
+            background: var(--windows-bg);
+        }
+
+        .sidebar-item {
+            transition: background-color 0.2s;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 2px 8px;
+            padding: 8px 16px;
+        }
+
+        .sidebar-item:hover {
+            background: rgba(0, 120, 212, 0.1);
+        }
+
+        .sidebar-item.active {
+            background: rgba(0, 120, 212, 0.15);
+            color: var(--windows-blue);
+            font-weight: 600;
+        }
+
+        .task-item {
+            transition: all 0.2s;
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--windows-border);
+        }
+
+        .task-item:hover {
+            background: rgba(0, 120, 212, 0.05);
+        }
+
+        .task-item.completed {
+            opacity: 0.6;
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            color: var(--windows-text-secondary);
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--windows-border);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .task-checkbox:hover {
+            border-color: var(--windows-blue);
+        }
+
+        .task-checkbox.checked {
+            background: var(--windows-blue);
+            border-color: var(--windows-blue);
+        }
+
+        .task-checkbox.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 12px;
+        }
+
+        .priority-indicator {
+            width: 4px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .priority-high { background: #d13438; }
+        .priority-medium { background: #ff8c00; }
+        .priority-low { background: #107c10; }
+
+        .important-star {
+            color: #ff8c00;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .important-star:hover {
+            transform: scale(1.2);
+        }
+
+        .search-input {
+            background: var(--windows-surface);
+            border: 1px solid var(--windows-border);
+            border-radius: 4px;
+            padding: 8px 12px 8px 40px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--windows-blue);
+        }
+
+        .add-task-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 16px;
+            color: var(--windows-text);
+        }
+
+        .add-task-input::placeholder {
+            color: var(--windows-text-secondary);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--windows-surface);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, var(--windows-blue), #106ebe);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .loading-spinner {
+            border: 2px solid var(--windows-border);
+            border-top: 2px solid var(--windows-blue);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 列表切换时的从上到下过渡效果 */
+        .slide-down {
+            animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 1000px;
+            }
+        }
+
+        /* 任务项的渐进式显示 */
+        .task-item-enter {
+            animation: taskItemEnter 0.3s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes taskItemEnter {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 为任务项添加延迟动画 */
+        .task-item-stagger-1 { animation-delay: 0.05s; }
+        .task-item-stagger-2 { animation-delay: 0.1s; }
+        .task-item-stagger-3 { animation-delay: 0.15s; }
+        .task-item-stagger-4 { animation-delay: 0.2s; }
+        .task-item-stagger-5 { animation-delay: 0.25s; }
+        .task-item-stagger-6 { animation-delay: 0.3s; }
+        .task-item-stagger-7 { animation-delay: 0.35s; }
+        .task-item-stagger-8 { animation-delay: 0.4s; }
+
+        /* 深色主题特定样式 */
+        [data-theme="dark"] .bg-white {
+            background-color: var(--windows-surface) !important;
+        }
+
+        [data-theme="dark"] .border-gray-200 {
+            border-color: var(--windows-border) !important;
+        }
+
+        [data-theme="dark"] .text-gray-600 {
+            color: var(--windows-text-secondary) !important;
+        }
+
+        [data-theme="dark"] .text-gray-500 {
+            color: var(--windows-text-secondary) !important;
+        }
+
+        [data-theme="dark"] .text-gray-400 {
+            color: var(--windows-text-secondary) !important;
+        }
+
+        [data-theme="dark"] .text-gray-300 {
+            color: var(--windows-text-secondary) !important;
+        }
+
+        [data-theme="dark"] .border-gray-300 {
+            border-color: var(--windows-border) !important;
+        }
+
+        [data-theme="dark"] .bg-gray-50 {
+            background-color: var(--windows-surface) !important;
+        }
+
+        [data-theme="dark"] .hover\\:bg-gray-50:hover {
+            background-color: var(--windows-bg) !important;
+        }
+
+        [data-theme="dark"] .hover\\:text-gray-600:hover {
+            color: var(--windows-text) !important;
+        }
+
+        [data-theme="dark"] .hover\\:text-gray-700:hover {
+            color: var(--windows-text) !important;
+        }
+
+        [data-theme="dark"] .hover\\:text-red-500:hover {
+            color: #ff6b6b !important;
+        }
+
+        [data-theme="dark"] .ring-blue-500:focus {
+            --tw-ring-color: var(--windows-blue) !important;
+        }
+
+        [data-theme="dark"] .border-green-100 {
+            border-color: rgba(16, 124, 16, 0.3) !important;
+        }
+
+        [data-theme="dark"] .text-green-800 {
+            color: #4ade80 !important;
+        }
+
+        [data-theme="dark"] .text-green-600 {
+            color: #4ade80 !important;
+        }
+
+        [data-theme="dark"] .text-orange-600 {
+            color: #fb923c !important;
+        }
+
+        [data-theme="dark"] .text-blue-600 {
+            color: #60a5fa !important;
+        }
+
+        /* 圆形按钮样式 */
+        #actionButtonsContainer {
+            position: relative;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--windows-surface);
+            color: var(--windows-text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .action-btn:hover {
+            background: var(--windows-blue);
+            color: white;
+            transform: scaleX(1.2);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 悬停时的挤压效果 */
+        #actionButtonsContainer:hover .action-btn:not(:hover) {
+            transform: scale(0.8);
+            opacity: 0.7;
+        }
+
+        /* 第一个按钮悬停时的特殊效果 */
+        #actionButtonsContainer:hover #newListBtn:hover ~ .action-btn {
+            transform: translateX(20px) scale(0.8);
+            opacity: 0.7;
+        }
+
+        /* 第二个按钮悬停时的特殊效果 */
+        #actionButtonsContainer:hover #newTaskBtn:hover {
+            z-index: 11;
+        }
+
+        #actionButtonsContainer:hover #newTaskBtn:hover ~ .action-btn {
+            transform: translateX(20px) scale(0.8);
+            opacity: 0.7;
+        }
+
+        /* 第三个按钮悬停时的特殊效果 */
+        #actionButtonsContainer:hover #moreBtn:hover {
+            z-index: 11;
+        }
+
+        /* 更多菜单样式 */
+        .more-menu {
+            position: absolute;
+            right: 60px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--windows-surface);
+            border: 1px solid var(--windows-border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 180px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-50%) translateX(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+        }
+
+        .more-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        .more-menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-bottom: 1px solid var(--windows-border);
+            color: var(--windows-text);
+        }
+
+        .more-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .more-menu-item:hover {
+            background: rgba(0, 120, 212, 0.1);
+            color: var(--windows-blue);
+        }
+
+        .more-menu-item i {
+            width: 16px;
+            text-align: center;
+        }
+
+        .more-menu-item span {
+            font-size: 14px;
+        }
+
+        /* 深色主题下的圆形按钮 */
+        [data-theme="dark"] .action-btn {
+            background: var(--windows-surface);
+            color: var(--windows-text);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .action-btn:hover {
+            background: var(--windows-blue);
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .more-menu {
+            background: var(--windows-surface);
+            border-color: var(--windows-border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .more-menu-item {
+            border-bottom-color: var(--windows-border);
+            color: var(--windows-text);
+        }
+
+        [data-theme="dark"] .more-menu-item:hover {
+            background: rgba(64, 128, 255, 0.2);
+            color: var(--windows-blue);
+        }
+
+        /* 图标选择样式 */
+        .icon-option {
+            width: 50px;
+            height: 50px;
+            border: 2px solid var(--windows-border);
+            border-radius: 8px;
+            background: var(--windows-surface);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-option:hover {
+            border-color: var(--windows-blue);
+            background: rgba(0, 120, 212, 0.1);
+            transform: scale(1.05);
+        }
+
+        .icon-option.selected {
+            border-color: var(--windows-blue);
+            background: rgba(0, 120, 212, 0.2);
+            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.3);
+        }
+
+        [data-theme="dark"] .icon-option {
+            border-color: var(--windows-border);
+            background: var(--windows-surface);
+        }
+
+        [data-theme="dark"] .icon-option:hover {
+            border-color: var(--windows-blue);
+            background: rgba(64, 128, 255, 0.2);
+        }
+
+        [data-theme="dark"] .icon-option.selected {
+            border-color: var(--windows-blue);
+            background: rgba(64, 128, 255, 0.3);
+            box-shadow: 0 0 0 2px rgba(64, 128, 255, 0.4);
+        }
+
+        /* AI助手样式 */
+        .ai-assistant-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--windows-blue), #4080ff);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-assistant-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 120, 212, 0.4);
+        }
+
+        .ai-assistant-btn:active {
+            transform: scale(0.95);
+        }
+
+        .ai-assistant-btn::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s;
+        }
+
+        .ai-assistant-btn:hover::before {
+            animation: aiShine 0.5s ease-in-out;
+        }
+
+        @keyframes aiShine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .ai-assistant-panel {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 380px;
+            height: 500px;
+            background: var(--windows-surface);
+            border: 1px solid var(--windows-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ai-assistant-panel.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+
+        .ai-assistant-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--windows-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ai-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--windows-blue), #4080ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+        }
+
+        .ai-assistant-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--windows-text);
+            margin: 0;
+        }
+
+        .ai-assistant-status {
+            font-size: 14px;
+            color: var(--windows-text-secondary);
+            margin: 0;
+        }
+
+        .ai-close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--windows-text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ai-close-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: var(--windows-text);
+        }
+
+        .ai-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .ai-message {
+            display: flex;
+            gap: 12px;
+            max-width: 100%;
+        }
+
+        .ai-message-user {
+            flex-direction: row-reverse;
+        }
+
+        .ai-avatar-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--windows-blue), #4080ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .ai-message-user .ai-avatar-small {
+            background: var(--windows-text);
+        }
+
+        .ai-message-content {
+            background: var(--windows-bg);
+            padding: 12px 16px;
+            border-radius: 16px;
+            color: var(--windows-text);
+            font-size: 14px;
+            line-height: 1.5;
+            max-width: 280px;
+        }
+
+        .ai-message-user .ai-message-content {
+            background: var(--windows-blue);
+            color: white;
+        }
+
+        .ai-suggestions {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0;
+        }
+
+        .ai-suggestions li {
+            padding: 4px 0;
+            position: relative;
+            padding-left: 16px;
+        }
+
+        .ai-suggestions li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--windows-blue);
+        }
+
+        .ai-message-user .ai-suggestions li::before {
+            color: white;
+        }
+
+        .ai-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--windows-border);
+        }
+
+        .ai-input-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .ai-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--windows-border);
+            border-radius: 24px;
+            background: var(--windows-bg);
+            color: var(--windows-text);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .ai-input:focus {
+            border-color: var(--windows-blue);
+            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+        }
+
+        .ai-send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--windows-blue);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ai-send-btn:hover {
+            background: var(--windows-blue-hover);
+            transform: scale(1.05);
+        }
+
+        .ai-send-btn:active {
+            transform: scale(0.95);
+        }
+
+        .ai-quick-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .ai-quick-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--windows-border);
+            border-radius: 8px;
+            background: var(--windows-bg);
+            color: var(--windows-text);
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .ai-quick-btn:hover {
+            background: var(--windows-blue);
+            color: white;
+            border-color: var(--windows-blue);
+            transform: translateY(-1px);
+        }
+
+        /* AI助手深色主题 */
+        [data-theme="dark"] .ai-assistant-panel {
+            background: var(--windows-surface);
+            border-color: var(--windows-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .ai-assistant-header {
+            border-color: var(--windows-border);
+        }
+
+        [data-theme="dark"] .ai-message-content {
+            background: var(--windows-bg);
+            color: var(--windows-text);
+        }
+
+        [data-theme="dark"] .ai-input {
+            background: var(--windows-bg);
+            border-color: var(--windows-border);
+            color: var(--windows-text);
+        }
+
+        [data-theme="dark"] .ai-quick-btn {
+            background: var(--windows-bg);
+            border-color: var(--windows-border);
+            color: var(--windows-text);
+        }
+
+        /* AI助手打字动画 */
+        .ai-typing {
+            display: inline-block;
+        }
+
+        .ai-typing::after {
+            content: '...';
+            animation: aiTyping 1.4s infinite;
+        }
+
+        @keyframes aiTyping {
+            0% { content: '.'; }
+            33% { content: '..'; }
+            66% { content: '...'; }
+            100% { content: '.'; }
+        }
+
+        /* AI助手消息进入动画 */
+        .ai-message-enter {
+            animation: aiMessageEnter 0.3s ease-out;
+        }
+
+        @keyframes aiMessageEnter {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* AI助手按钮拖动功能 */
+        .ai-assistant-btn.draggable {
+            cursor: move;
+        }
+
+        .ai-assistant-btn.dragging {
+            opacity: 0.8;
+            transform: scale(1.1);
+            z-index: 9999;
+        }
+
+        /* 拖动时的阴影效果 */
+        .ai-assistant-btn.dragging {
+            box-shadow: 0 8px 32px rgba(0, 120, 212, 0.6);
+        }
+
+        /* 防止拖动时选中文本 */
+        .ai-assistant-btn.dragging {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        /* 拖动边界指示器 */
+        .drag-boundary {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        .drag-boundary.active {
+            border: 2px dashed var(--windows-blue);
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+    <div class="flex h-full">
+        <!-- 侧边栏 -->
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <!-- 搜索框 -->
+            <div class="p-4 border-b border-gray-200">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" 
+                           id="searchInput" 
+                           class="search-input" 
+                           placeholder="搜索任务">
+                </div>
+            </div>
+
+            <!-- 新建任务区域 - 三个圆形按钮 -->
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex justify-center items-center h-16 relative" id="actionButtonsContainer">
+                    <!-- 新建列表按钮 -->
+                    <button class="action-btn" id="newListBtn" onclick="showNewListModal()" title="新建列表">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    
+                    <!-- 新建任务按钮 -->
+                    <button class="action-btn" id="newTaskBtn" onclick="showAddTaskModal()" title="新建任务">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    
+                    <!-- 更多选项按钮 -->
+                    <button class="action-btn" id="moreBtn" onclick="toggleMoreMenu()" title="更多选项">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                    
+                    <!-- 更多选项菜单 -->
+                    <div class="more-menu" id="moreMenu">
+                        <div class="more-menu-item" onclick="handleMoreAction('import')">
+                            <i class="fas fa-import"></i>
+                            <span>导入任务</span>
+                        </div>
+                        <div class="more-menu-item" onclick="handleMoreAction('export')">
+                            <i class="fas fa-export"></i>
+                            <span>导出任务</span>
+                        </div>
+                        <div class="more-menu-item" onclick="handleMoreAction('ai_config')">
+                            <i class="fas fa-robot"></i>
+                            <span>AI配置</span>
+                        </div>
+                        <div class="more-menu-item" onclick="handleMoreAction('settings')">
+                            <i class="fas fa-cog"></i>
+                            <span>设置</span>
+                        </div>
+                        <div class="more-menu-item" onclick="handleMoreAction('about')">
+                            <i class="fas fa-info-circle"></i>
+                            <span>关于</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航菜单 -->
+            <nav class="flex-1 overflow-y-auto p-2" id="sidebarNav">
+                <!-- 动态生成的导航项 -->
+            </nav>
+
+            <!-- 底部统计 -->
+            <div class="p-4 border-t border-gray-200">
+                <div class="text-sm text-gray-600" id="statsInfo">
+                    <div class="loading-spinner mx-auto mb-2"></div>
+                    <div class="text-center">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="flex-1 flex flex-col">
+            <!-- 顶部标题栏 -->
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-semibold" id="pageTitle">我的一天</h1>
+                        <p class="text-sm text-gray-600 mt-1" id="pageSubtitle">今日任务</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button class="windows-button-secondary" onclick="toggleShowCompleted()">
+                            <i class="fas fa-eye" id="showCompletedIcon"></i>
+                        </button>
+                        <button class="windows-button-secondary" onclick="toggleTheme()">
+                            <i class="fas fa-moon" id="themeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <main class="flex-1 overflow-y-auto" id="mainContent">
+                <div class="max-w-4xl mx-auto p-6">
+                    <!-- 添加任务输入框 -->
+                    <div class="windows-card mb-6">
+                        <div class="flex items-center">
+                            <div class="task-checkbox" onclick="addQuickTask()"></div>
+                            <input type="text" 
+                                   id="quickAddInput" 
+                                   class="add-task-input" 
+                                   placeholder="添加任务，按回车确认"
+                                   onkeypress="handleQuickAdd(event)">
+                        </div>
+                    </div>
+
+                    <!-- 任务列表容器 -->
+                    <div id="tasksList" class="space-y-2">
+                        <!-- 动态生成的任务项 -->
+                    </div>
+
+                    <!-- 搜索结果页面 -->
+                    <div id="searchResults" class="hidden fade-in">
+                        <!-- 动态生成的搜索结果 -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 添加/编辑任务模态框 -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold" id="modalTitle">新建任务</h2>
+                <button onclick="hideTaskModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">任务标题</label>
+                    <input type="text" 
+                           id="taskTitle" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">描述</label>
+                    <textarea id="taskDescription" 
+                              rows="3"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">优先级</label>
+                        <select id="taskPriority" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="low">低</option>
+                            <option value="medium" selected>中</option>
+                            <option value="high">高</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2">截止日期</label>
+                        <input type="date" 
+                               id="taskDueDate"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">任务列表</label>
+                    <select id="taskListId" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- 动态生成的选项 -->
+                    </select>
+                </div>
+
+                <div class="mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="taskImportant" class="mr-2">
+                        <span class="text-sm font-medium">标记为重要</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" 
+                            onclick="hideTaskModal()"
+                            class="windows-button-secondary px-4 py-2">
+                        取消
+                    </button>
+                    <button type="submit" class="windows-button px-4 py-2">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新建列表模态框 -->
+    <div id="newListModal" class="modal">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">新建列表</h2>
+                <button onclick="hideNewListModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="newListForm" onsubmit="saveNewList(event)">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">列表名称</label>
+                    <input type="text" 
+                           id="newListName" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="输入列表名称"
+                           required>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">选择图标</label>
+                    <div class="grid grid-cols-6 gap-3">
+                        <button type="button" class="icon-option" data-icon="📋" onclick="selectIcon('📋')">
+                            <span class="text-2xl">📋</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="📁" onclick="selectIcon('📁')">
+                            <span class="text-2xl">📁</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="📂" onclick="selectIcon('📂')">
+                            <span class="text-2xl">📂</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🗂️" onclick="selectIcon('🗂️')">
+                            <span class="text-2xl">🗂️</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="📝" onclick="selectIcon('📝')">
+                            <span class="text-2xl">📝</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="📄" onclick="selectIcon('📄')">
+                            <span class="text-2xl">📄</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🏠" onclick="selectIcon('🏠')">
+                            <span class="text-2xl">🏠</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="💼" onclick="selectIcon('💼')">
+                            <span class="text-2xl">💼</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🎯" onclick="selectIcon('🎯')">
+                            <span class="text-2xl">🎯</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="⭐" onclick="selectIcon('⭐')">
+                            <span class="text-2xl">⭐</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🔥" onclick="selectIcon('🔥')">
+                            <span class="text-2xl">🔥</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="💡" onclick="selectIcon('💡')">
+                            <span class="text-2xl">💡</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🎨" onclick="selectIcon('🎨')">
+                            <span class="text-2xl">🎨</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🎵" onclick="selectIcon('🎵')">
+                            <span class="text-2xl">🎵</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🎮" onclick="selectIcon('🎮')">
+                            <span class="text-2xl">🎮</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="📚" onclick="selectIcon('📚')">
+                            <span class="text-2xl">📚</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🛒" onclick="selectIcon('🛒')">
+                            <span class="text-2xl">🛒</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="🚗" onclick="selectIcon('🚗')">
+                            <span class="text-2xl">🚗</span>
+                        </button>
+                        <button type="button" class="icon-option" data-icon="✈️" onclick="selectIcon('✈️')">
+                            <span class="text-2xl">✈️</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="newListIcon" value="📋">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" 
+                            onclick="hideNewListModal()"
+                            class="windows-button-secondary px-4 py-2">
+                        取消
+                    </button>
+                    <button type="submit" class="windows-button px-4 py-2">
+                        创建列表
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- AI助手配置模态框 -->
+    <div id="aiConfigModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">AI助手配置</h2>
+                <button onclick="hideAIConfigModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="aiConfigForm" onsubmit="saveAIConfig(event)">
+                <!-- 基本设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4">基本设置</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">助手名称</label>
+                        <input type="text" 
+                               id="aiName" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               value="AI助手">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">模型</label>
+                        <select id="aiModel" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            <option value="gpt-4">GPT-4</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="claude-3-haiku">Claude 3 Haiku</option>
+                            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">API基础URL</label>
+                        <input type="url" 
+                               id="aiApiBase" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="https://api.openai.com/v1"
+                               value="https://api.openai.com/v1">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">API密钥</label>
+                        <input type="password" 
+                               id="aiApiKey" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="输入你的API密钥">
+                        <p class="text-xs text-gray-500 mt-1">支持OpenAI兼容的API密钥</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">最大令牌数</label>
+                            <input type="number" 
+                                   id="aiMaxTokens" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="500"
+                                   min="100"
+                                   max="2000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">温度</label>
+                            <input type="number" 
+                                   id="aiTemperature" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="0.7"
+                                   min="0"
+                                   max="2"
+                                   step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4">高级设置</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">系统提示词</label>
+                        <textarea id="aiSystemPrompt" 
+                                  rows="4"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="定义AI助手的角色和行为...">你是一个专业的任务管理AI助手，帮助用户高效管理他们的待办事项。你的任务是：
+1. 帮助用户创建、编辑和管理任务
+2. 提供任务优先级建议
+3. 协助制定时间管理计划
+4. 回答任务管理相关的问题
+5. 提供提高效率的建议
+
+请用友好、专业的语调回复，回复要简洁有用。如果用户询问任务相关的信息，你可以基于当前的任务数据回答。</textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">欢迎消息</label>
+                        <textarea id="aiWelcomeMessage" 
+                                  rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="AI助手的欢迎消息...">你好！我是你的AI助手 👋
+我可以帮助你管理任务，比如：
+• 创建新任务
+• 查找特定任务
+• 管理任务优先级
+• 提供任务建议
+
+有什么可以帮助你的吗？</textarea>
+                    </div>
+                </div>
+
+                <!-- 测试连接 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4">测试连接</h3>
+                    <button type="button" 
+                            onclick="testAIConnection()"
+                            class="windows-button-secondary px-4 py-2">
+                        <i class="fas fa-plug mr-2"></i>测试连接
+                    </button>
+                    <div id="aiTestResult" class="mt-3 text-sm"></div>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" 
+                            onclick="hideAIConfigModal()"
+                            class="windows-button-secondary px-4 py-2">
+                        取消
+                    </button>
+                    <button type="submit" class="windows-button px-4 py-2">
+                        保存配置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- AI助手 -->
+    <div id="aiAssistant" class="fixed bottom-4 right-4 z-50">
+        <!-- AI助手按钮 -->
+        <button id="aiAssistantBtn" 
+                class="ai-assistant-btn"
+                onclick="toggleAIAssistant()">
+            <i class="fas fa-robot"></i>
+        </button>
+        
+        <!-- AI助手面板 -->
+        <div id="aiAssistantPanel" class="ai-assistant-panel">
+            <!-- AI助手头部 -->
+            <div class="ai-assistant-header">
+                <div class="flex items-center space-x-3">
+                    <div class="ai-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <h3 class="ai-assistant-title">AI助手</h3>
+                        <p class="ai-assistant-status">在线 · 随时为您服务</p>
+                    </div>
+                </div>
+                <button class="ai-close-btn" onclick="toggleAIAssistant()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- 聊天消息区域 -->
+            <div id="aiChatMessages" class="ai-chat-messages">
+                <div class="ai-message ai-message-assistant">
+                    <div class="ai-avatar-small">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="ai-message-content">
+                        <p>你好！我是你的AI助手 👋</p>
+                        <p>我可以帮助你管理任务，比如：</p>
+                        <ul class="ai-suggestions">
+                            <li>创建新任务</li>
+                            <li>查找特定任务</li>
+                            <li>管理任务优先级</li>
+                            <li>提供任务建议</li>
+                        </ul>
+                        <p>有什么可以帮助你的吗？</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 输入区域 -->
+            <div class="ai-input-area">
+                <div class="ai-input-container">
+                    <input type="text" 
+                           id="aiInput" 
+                           class="ai-input" 
+                           placeholder="问我任何关于任务管理的问题..."
+                           onkeypress="handleAIInput(event)">
+                    <button class="ai-send-btn" onclick="sendAIMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                
+                <!-- 快捷操作按钮 -->
+                <div class="ai-quick-actions">
+                    <button class="ai-quick-btn" onclick="handleQuickAction('create')">
+                        <i class="fas fa-plus"></i>
+                        创建任务
+                    </button>
+                    <button class="ai-quick-btn" onclick="handleQuickAction('find')">
+                        <i class="fas fa-search"></i>
+                        查找任务
+                    </button>
+                    <button class="ai-quick-btn" onclick="handleQuickAction('summary')">
+                        <i class="fas fa-chart-pie"></i>
+                        任务总结
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden fade-in">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span id="notificationText">操作成功</span>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
