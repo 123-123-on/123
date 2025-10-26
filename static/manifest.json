@@ -1,6 +1,6 @@
 {
-  "name": "Microsoft To Do",
-  "short_name": "To Do",
+  "name": "Daily Todo",
+  "short_name": "Daily Todo",
   "description": "一个功能强大的任务管理应用，支持AI智能助手",
   "start_url": "/",
   "display": "standalone",
