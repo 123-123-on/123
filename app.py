@@ -426,7 +426,8 @@ def handle_user_preferences():
                 'transparency_enabled': bool(prefs['transparency_enabled']),
                 'view_mode': prefs['view_mode'],
                 'show_completed': bool(prefs['show_completed']),
-                'default_list_id': prefs['default_list_id']
+                'default_list_id': prefs['default_list_id'],
+                'pwa_install_dismissed': bool(prefs['pwa_install_dismissed']) if prefs['pwa_install_dismissed'] is not None else False
             })
         else:
             # 如果没有偏好设置，创建默认设置
@@ -459,7 +460,7 @@ def handle_user_preferences():
         
         for field in ['theme', 'language', 'accent_color', 'font_size', 
                      'animations_enabled', 'transparency_enabled', 
-                     'view_mode', 'show_completed', 'default_list_id']:
+                     'view_mode', 'show_completed', 'default_list_id', 'pwa_install_dismissed']:
             if field in data:
                 update_fields.append(f"{field} = ?")
                 update_values.append(data[field])
@@ -1952,9 +1953,9 @@ def login():
     """用户登录"""
     try:
         data = request.get_json()
-        username_or_email = data.get('username_or_email', '').strip()
+        username_or_email = data.get('username', '').strip()  # 改为接收username参数
         password = data.get('password', '')
-        remember_me = data.get('remember_me', False)
+        remember_me = data.get('remember', False)  # 改为接收remember参数
         
         if not username_or_email or not password:
             return jsonify({
@@ -2071,6 +2072,139 @@ def check_auth():
             'authenticated': False
         })
 
+@app.route('/api/user/delete-account', methods=['DELETE'])
+def delete_account():
+    # 检查用户是否已登录
+    if not current_user.is_authenticated:
+        return jsonify({'success': False, 'error': '请先登录'}), 401
+    """删除用户账户和所有相关数据"""
+    try:
+        user_id = get_current_user_id()
+        
+        # 获取确认信息
+        data = request.get_json()
+        confirmation = data.get('confirmation', '').strip()
+        
+        # 验证确认文本
+        if confirmation != '删除我的账户':
+            return jsonify({
+                'success': False,
+                'error': '确认文本不正确，请输入"删除我的账户"来确认删除操作'
+            }), 400
+        
+        # 验证密码
+        password = data.get('password', '')
+        if not password:
+            return jsonify({
+                'success': False,
+                'error': '请输入密码以确认删除操作'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取用户信息以验证密码
+        cursor.execute('SELECT password_hash FROM users WHERE id = ?', (user_id,))
+        user_data = cursor.fetchone()
+        
+        if not user_data:
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': '用户不存在'
+            }), 404
+        
+        # 验证密码
+        if not bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': '密码错误'
+            }), 401
+        
+        # 开始删除用户数据（按外键依赖顺序）
+        try:
+            # 1. 删除用户会话
+            cursor.execute('DELETE FROM user_sessions WHERE user_id = ?', (user_id,))
+            
+            # 2. 删除用户偏好设置
+            cursor.execute('DELETE FROM user_preferences WHERE user_id = ?', (user_id,))
+            
+            # 3. 删除用户的所有任务
+            cursor.execute('DELETE FROM tasks WHERE user_id = ?', (user_id,))
+            
+            # 4. 删除用户的所有任务列表
+            cursor.execute('DELETE FROM task_lists WHERE user_id = ?', (user_id,))
+            
+            # 5. 最后删除用户账户
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            
+            conn.commit()
+            conn.close()
+            
+            # 登出用户
+            logout_user()
+            
+            return jsonify({
+                'success': True,
+                'message': '账户及所有相关数据已成功删除'
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': f'删除数据时发生错误: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'删除账户失败: {str(e)}'
+        }), 500
+
+@app.route('/api/auth/get_user_data_summary', methods=['GET'])
+@login_required
+def get_user_data_summary():
+    """获取用户数据摘要，用于删除前确认"""
+    try:
+        user_id = get_current_user_id()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 统计用户数据
+        cursor.execute('SELECT COUNT(*) as task_count FROM tasks WHERE user_id = ?', (user_id,))
+        task_count = cursor.fetchone()['task_count']
+        
+        cursor.execute('SELECT COUNT(*) as list_count FROM task_lists WHERE user_id = ?', (user_id,))
+        list_count = cursor.fetchone()['list_count']
+        
+        cursor.execute('SELECT COUNT(*) as session_count FROM user_sessions WHERE user_id = ?', (user_id,))
+        session_count = cursor.fetchone()['session_count']
+        
+        # 获取用户创建时间
+        cursor.execute('SELECT created_at FROM users WHERE id = ?', (user_id,))
+        user_created = cursor.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data_summary': {
+                'task_count': task_count,
+                'list_count': list_count,
+                'session_count': session_count,
+                'account_created_at': user_created['created_at'] if user_created else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取数据摘要失败: {str(e)}'
+        }), 500
+
 # 登录和注册页面
 @app.route('/login')
 def login_page():
@@ -2091,6 +2225,384 @@ def logout_page():
     """登出页面"""
     logout_user()
     return redirect(url_for('login_page'))
+
+# 后台管理页面
+@app.route('/admin')
+@login_required
+def admin_page():
+    """后台管理页面"""
+    # 简单的权限检查 - 只有用户123可以访问
+    if current_user.username != '123':
+        return redirect(url_for('index'))
+    return render_template('admin.html')
+
+# 后台管理API - 获取用户统计
+@app.route('/api/admin/stats/users')
+@login_required
+def admin_stats_users():
+    """获取用户统计数据"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 总用户数
+        cursor.execute('SELECT COUNT(*) as total FROM users')
+        total_users = cursor.fetchone()['total']
+        
+        # 今日注册用户数
+        today = date.today().isoformat()
+        cursor.execute('SELECT COUNT(*) as today_count FROM users WHERE DATE(created_at) = ?', (today,))
+        today_users = cursor.fetchone()['today_count']
+        
+        # 活跃用户数（有登录记录的）
+        cursor.execute('SELECT COUNT(*) as active_count FROM users WHERE last_login IS NOT NULL')
+        active_users = cursor.fetchone()['active_count']
+        
+        conn.close()
+        
+        return jsonify({
+            'total': total_users,
+            'today': today_users,
+            'active': active_users
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 后台管理API - 获取任务统计
+@app.route('/api/admin/stats/tasks')
+@login_required
+def admin_stats_tasks():
+    """获取任务统计数据"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 总任务数
+        cursor.execute('SELECT COUNT(*) as total FROM tasks')
+        total_tasks = cursor.fetchone()['total']
+        
+        # 总列表数
+        cursor.execute('SELECT COUNT(*) as total FROM task_lists')
+        total_lists = cursor.fetchone()['total']
+        
+        # 今日活跃用户（有任务操作的用户）
+        today = date.today().isoformat()
+        cursor.execute('''
+            SELECT COUNT(DISTINCT t.user_id) as active_today 
+            FROM tasks t 
+            WHERE DATE(t.created_at) = ? OR DATE(t.updated_at) = ?
+        ''', (today, today))
+        active_today = cursor.fetchone()['active_today']
+        
+        conn.close()
+        
+        return jsonify({
+            'total': total_tasks,
+            'lists': total_lists,
+            'active_today': active_today
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 后台管理API - 获取用户列表
+@app.route('/api/admin/users')
+@login_required
+def admin_get_users():
+    """获取用户列表"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        # 获取查询参数
+        limit = request.args.get('limit', type=int)
+        sort = request.args.get('sort', 'created_at')
+        order = request.args.get('order', 'desc')
+        
+        # 构建查询
+        query = '''
+            SELECT id, username, email, full_name, is_active, created_at, last_login
+            FROM users
+        '''
+        params = []
+        
+        # 添加排序
+        if sort in ['username', 'email', 'created_at', 'last_login']:
+            query += f' ORDER BY {sort}'
+            if order.upper() == 'DESC':
+                query += ' DESC'
+            else:
+                query += ' ASC'
+        
+        # 添加限制
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        users = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for user in users:
+            result.append({
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'full_name': user['full_name'],
+                'is_active': bool(user['is_active']),
+                'created_at': user['created_at'],
+                'last_login': user['last_login']
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 后台管理API - 切换用户状态
+@app.route('/api/admin/users/<int:user_id>/status', methods=['PUT'])
+@login_required
+def admin_toggle_user_status(user_id):
+    """切换用户状态"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        data = request.get_json()
+        is_active = data.get('is_active', True)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 更新用户状态
+        cursor.execute('UPDATE users SET is_active = ? WHERE id = ?', (is_active, user_id))
+        conn.commit()
+        
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'error': '用户不存在'}), 404
+        
+        conn.close()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 后台管理API - 删除用户及其所有数据
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def admin_delete_user(user_id):
+    """删除用户及其所有相关数据"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        # 防止删除管理员自己
+        if current_user.username == '123' and int(current_user.id) == user_id:
+            return jsonify({'error': '不能删除管理员账户'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查用户是否存在
+        cursor.execute('SELECT username FROM users WHERE id = ?', (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({'error': '用户不存在'}), 404
+        
+        username = user['username']
+        
+        # 开始删除用户数据（按外键依赖顺序）
+        try:
+            # 1. 删除用户会话
+            cursor.execute('DELETE FROM user_sessions WHERE user_id = ?', (user_id,))
+            sessions_deleted = cursor.rowcount
+            
+            # 2. 删除用户偏好设置
+            cursor.execute('DELETE FROM user_preferences WHERE user_id = ?', (user_id,))
+            prefs_deleted = cursor.rowcount
+            
+            # 3. 删除用户的所有任务
+            cursor.execute('DELETE FROM tasks WHERE user_id = ?', (user_id,))
+            tasks_deleted = cursor.rowcount
+            
+            # 4. 删除用户的所有任务列表
+            cursor.execute('DELETE FROM task_lists WHERE user_id = ?', (user_id,))
+            lists_deleted = cursor.rowcount
+            
+            # 5. 最后删除用户账户
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            users_deleted = cursor.rowcount
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'message': f'用户 "{username}" 及其所有数据已成功删除',
+                'deleted_data': {
+                    'sessions': sessions_deleted,
+                    'preferences': prefs_deleted,
+                    'tasks': tasks_deleted,
+                    'lists': lists_deleted,
+                    'user': users_deleted
+                }
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': f'删除用户数据时发生错误: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'删除用户失败: {str(e)}'
+        }), 500
+
+# 后台管理API - 获取用户详细信息
+@app.route('/api/admin/users/<int:user_id>/details', methods=['GET'])
+@login_required
+def admin_get_user_details(user_id):
+    """获取用户详细信息，包括数据统计"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取用户基本信息
+        cursor.execute('''
+            SELECT id, username, email, full_name, is_active, created_at, last_login
+            FROM users 
+            WHERE id = ?
+        ''', (user_id,))
+        
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return jsonify({'error': '用户不存在'}), 404
+        
+        # 获取用户数据统计
+        cursor.execute('SELECT COUNT(*) as task_count FROM tasks WHERE user_id = ?', (user_id,))
+        task_count = cursor.fetchone()['task_count']
+        
+        cursor.execute('SELECT COUNT(*) as list_count FROM task_lists WHERE user_id = ?', (user_id,))
+        list_count = cursor.fetchone()['list_count']
+        
+        cursor.execute('SELECT COUNT(*) as completed_tasks FROM tasks WHERE user_id = ? AND completed = 1', (user_id,))
+        completed_tasks = cursor.fetchone()['completed_tasks']
+        
+        cursor.execute('SELECT COUNT(*) as session_count FROM user_sessions WHERE user_id = ?', (user_id,))
+        session_count = cursor.fetchone()['session_count']
+        
+        # 获取最近的任务
+        cursor.execute('''
+            SELECT title, created_at, completed, priority
+            FROM tasks 
+            WHERE user_id = ?
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ''', (user_id,))
+        recent_tasks = cursor.fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'full_name': user['full_name'],
+                'is_active': bool(user['is_active']),
+                'created_at': user['created_at'],
+                'last_login': user['last_login']
+            },
+            'statistics': {
+                'task_count': task_count,
+                'list_count': list_count,
+                'completed_tasks': completed_tasks,
+                'pending_tasks': task_count - completed_tasks,
+                'session_count': session_count
+            },
+            'recent_tasks': [
+                {
+                    'title': task['title'],
+                    'created_at': task['created_at'],
+                    'completed': bool(task['completed']),
+                    'priority': task['priority']
+                }
+                for task in recent_tasks
+            ]
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 后台管理API - 获取任务列表
+@app.route('/api/admin/tasks')
+@login_required
+def admin_get_tasks():
+    """获取任务列表"""
+    if current_user.username != '123':
+        return jsonify({'error': '权限不足'}), 403
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取所有任务及其用户信息
+        cursor.execute('''
+            SELECT 
+                t.id, t.title, t.description, t.completed, t.priority, 
+                t.created_at, t.updated_at, t.due_date,
+                u.username, u.email,
+                tl.name as list_name
+            FROM tasks t
+            LEFT JOIN users u ON t.user_id = u.id
+            LEFT JOIN task_lists tl ON t.list_id = tl.id
+            ORDER BY t.created_at DESC
+        ''')
+        tasks = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for task in tasks:
+            result.append({
+                'id': task['id'],
+                'title': task['title'],
+                'description': task['description'],
+                'completed': bool(task['completed']),
+                'priority': task['priority'],
+                'created_at': task['created_at'],
+                'updated_at': task['updated_at'],
+                'due_date': task['due_date'],
+                'username': task['username'],
+                'email': task['email'],
+                'list_name': task['list_name']
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

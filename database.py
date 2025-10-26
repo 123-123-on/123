@@ -123,6 +123,16 @@ def migrate_database():
             cursor.execute('UPDATE task_lists SET user_id = ? WHERE user_id IS NULL', (user_id,))
             print(f"将现有数据关联到默认用户 (ID: {user_id})")
         
+        # 检查user_preferences表是否有pwa_install_dismissed字段
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
+        if cursor.fetchone():
+            cursor.execute("PRAGMA table_info(user_preferences)")
+            pref_columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'pwa_install_dismissed' not in pref_columns:
+                cursor.execute('ALTER TABLE user_preferences ADD COLUMN pwa_install_dismissed BOOLEAN DEFAULT 0')
+                print("添加pwa_install_dismissed字段")
+        
         # 创建会话表
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_sessions'")
         if not cursor.fetchone():
@@ -227,6 +237,7 @@ def init_database():
             view_mode TEXT DEFAULT 'list',
             show_completed BOOLEAN DEFAULT 1,
             default_list_id INTEGER,
+            pwa_install_dismissed BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)

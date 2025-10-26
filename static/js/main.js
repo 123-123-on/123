@@ -24,6 +24,82 @@ let calendarDropZone = null;
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthStatus();
+    checkMobileView();
+});
+
+// 检查是否为移动端视图
+function checkMobileView() {
+    const isMobile = window.innerWidth <= 768;
+    const mobileHeader = document.querySelector('.mobile-header');
+    const desktopHeader = document.querySelector('header.bg-white');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (isMobile) {
+        // 显示移动端头部，隐藏桌面端头部
+        if (mobileHeader) mobileHeader.style.display = 'flex';
+        if (desktopHeader) desktopHeader.style.display = 'none';
+        
+        // 侧边栏默认隐藏
+        if (sidebar) {
+            sidebar.classList.remove('mobile-open');
+        }
+    } else {
+        // 隐藏移动端头部，显示桌面端头部
+        if (mobileHeader) mobileHeader.style.display = 'none';
+        if (desktopHeader) desktopHeader.style.display = 'block';
+        
+        // 侧边栏默认显示
+        if (sidebar) {
+            sidebar.classList.remove('mobile-open');
+        }
+    }
+}
+
+// 切换移动端侧边栏
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    
+    if (sidebar && overlay) {
+        const isOpen = sidebar.classList.contains('mobile-open');
+        
+        if (isOpen) {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('show');
+        } else {
+            sidebar.classList.add('mobile-open');
+            overlay.classList.add('show');
+        }
+    }
+}
+
+// 点击外部关闭移动端侧边栏
+document.addEventListener('click', function(event) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+    const isMobile = window.innerWidth <= 768;
+    
+    // 只在移动端模式下处理
+    if (isMobile && sidebar && sidebar.classList.contains('mobile-open')) {
+        // 检查是否点击了侧边栏外部区域
+        // 排除侧边栏本身、菜单按钮、遮罩层
+        if (!sidebar.contains(event.target) && 
+            !mobileMenuBtn.contains(event.target) &&
+            !overlay.contains(event.target)) {
+            
+            // 关闭侧边栏
+            sidebar.classList.remove('mobile-open');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+    }
+});
+
+// 监听窗口大小变化
+window.addEventListener('resize', function() {
+    checkMobileView();
 });
     
 // 检查用户认证状态
@@ -57,6 +133,7 @@ function updateUserDisplay() {
     const userDisplayName = document.getElementById('userDisplayName');
     const userEmail = document.getElementById('userEmail');
     const userAvatar = document.getElementById('userAvatar');
+    const mobileUserAvatar = document.getElementById('mobileUserAvatar');
     
     if (userDisplayName) {
         userDisplayName.textContent = currentUser.full_name || currentUser.username;
@@ -66,6 +143,7 @@ function updateUserDisplay() {
         userEmail.textContent = currentUser.email;
     }
     
+    // 桌面端用户头像
     if (userAvatar) {
         // 如果有头像URL，使用头像；否则显示用户名首字母
         if (currentUser.avatar_url) {
@@ -73,6 +151,17 @@ function updateUserDisplay() {
         } else {
             const firstLetter = (currentUser.username || 'U').charAt(0).toUpperCase();
             userAvatar.innerHTML = `<span style="display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; background: var(--windows-blue); color: white; border-radius: 50%; font-size: 12px; font-weight: bold;">${firstLetter}</span>`;
+        }
+    }
+    
+    // 移动端用户头像
+    if (mobileUserAvatar) {
+        // 如果有头像URL，使用头像；否则显示用户名首字母
+        if (currentUser.avatar_url) {
+            mobileUserAvatar.innerHTML = `<img src="${currentUser.avatar_url}" alt="用户头像" style="width: 24px; height: 24px; border-radius: 50%;">`;
+        } else {
+            const firstLetter = (currentUser.username || 'U').charAt(0).toUpperCase();
+            mobileUserAvatar.innerHTML = `<span style="display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center; background: var(--windows-blue); color: white; border-radius: 50%; font-size: 14px; font-weight: bold;">${firstLetter}</span>`;
         }
     }
 }
@@ -125,9 +214,13 @@ async function logout() {
 // 点击外部关闭用户菜单
 document.addEventListener('click', function(event) {
     const userMenuBtn = document.getElementById('userMenuBtn');
+    const mobileUserMenuBtn = document.getElementById('mobileUserMenuBtn');
     const userMenu = document.getElementById('userMenu');
     
-    if (userMenu && !userMenuBtn.contains(event.target) && !userMenu.contains(event.target)) {
+    if (userMenu && userMenuBtn && mobileUserMenuBtn && 
+        !userMenuBtn.contains(event.target) && 
+        !mobileUserMenuBtn.contains(event.target) && 
+        !userMenu.contains(event.target)) {
         userMenu.classList.add('hidden');
     }
 });
@@ -143,6 +236,9 @@ async function initializeApp() {
         
         // 初始化AI助手拖动功能
         initializeAIDrag();
+        
+        // 检查PWA安装提示
+        checkPWAInstallPrompt();
         
         // 默认显示"我的一天"列表
         const todayList = taskLists.find(list => list.name === '我的一天');
@@ -1118,11 +1214,23 @@ function handleMoreAction(action) {
             showAIConfigModal();
             break;
         case 'settings':
-            showNotification('设置功能开发中...', 'info');
+            showSettingsModal();
             break;
-        case 'about':
-            showNotification('Microsoft To Do 克隆版本 v1.0', 'info');
+        case 'themes':
+            showThemesModal();
             break;
+        case 'notifications':
+            showNotificationsModal();
+            break;
+        case 'shortcuts':
+            showShortcutsModal();
+            break;
+        case 'install_app':
+            showInstallAppDialog();
+            break;
+    case 'about':
+        showAboutDialog();
+        break;
         default:
             showNotification('功能开发中...', 'info');
     }
@@ -1783,13 +1891,599 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// 通用设置相关功能
+function showSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    modal.classList.add('show');
+    loadSettings();
+    
+    // 触发内容动画
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+function hideSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // 先隐藏内容
+    if (content) {
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+    }
+    
+    // 延迟隐藏模态框
+    setTimeout(() => {
+        modal.classList.remove('show');
+    }, 300);
+}
+
+function loadSettings() {
+    // 从localStorage加载设置
+    const settings = JSON.parse(localStorage.getItem('appSettings') || '{}');
+    
+    // 基本设置
+    document.getElementById('languageSetting').value = settings.language || 'zh-CN';
+    document.getElementById('timezoneSetting').value = settings.timezone || 'Asia/Shanghai';
+    document.getElementById('defaultListSetting').value = settings.defaultList || 'today';
+    document.getElementById('taskSortSetting').value = settings.taskSort || 'created';
+    
+    // 数据管理
+    document.getElementById('autoSaveInterval').value = settings.autoSaveInterval || '0';
+    document.getElementById('dataCleanupSetting').value = settings.dataCleanup || 'never';
+    document.getElementById('enableBackup').checked = settings.enableBackup !== false;
+    document.getElementById('enableSync').checked = settings.enableSync || false;
+}
+
+async function saveSettings(event) {
+    event.preventDefault();
+    
+    const settings = {
+        language: document.getElementById('languageSetting').value,
+        timezone: document.getElementById('timezoneSetting').value,
+        defaultList: document.getElementById('defaultListSetting').value,
+        taskSort: document.getElementById('taskSortSetting').value,
+        autoSaveInterval: document.getElementById('autoSaveInterval').value,
+        dataCleanup: document.getElementById('dataCleanupSetting').value,
+        enableBackup: document.getElementById('enableBackup').checked,
+        enableSync: document.getElementById('enableSync').checked
+    };
+    
+    // 保存到localStorage
+    localStorage.setItem('appSettings', JSON.stringify(settings));
+    
+    // 保存到服务器
+    try {
+        const response = await fetch('/api/user_preferences', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        if (response.ok) {
+            hideSettingsModal();
+            showNotification('设置已保存');
+            
+            // 应用语言设置
+            if (settings.language) {
+                applyLanguageSetting(settings.language);
+            }
+        } else {
+            throw new Error('保存失败');
+        }
+    } catch (error) {
+        console.error('保存设置失败:', error);
+        showNotification('保存设置失败', 'error');
+    }
+}
+
+function applyLanguageSetting(language) {
+    // 这里可以实现语言切换逻辑
+    console.log('应用语言设置:', language);
+    // 可以重新加载页面或更新界面文本
+}
+
+// 主题外观相关功能
+function showThemesModal() {
+    const modal = document.getElementById('themesModal');
+    modal.classList.add('show');
+    loadThemes();
+    
+    // 触发内容动画
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+function hideThemesModal() {
+    const modal = document.getElementById('themesModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // 先隐藏内容
+    if (content) {
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+    }
+    
+    // 延迟隐藏模态框
+    setTimeout(() => {
+        modal.classList.remove('show');
+    }, 300);
+}
+
+function loadThemes() {
+    // 从localStorage加载主题设置
+    const themes = JSON.parse(localStorage.getItem('appThemes') || '{}');
+    
+    // 预设主题
+    const currentTheme = themes.theme || 'light';
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    const selectedTheme = document.querySelector(`.theme-option[onclick="selectTheme('${currentTheme}')"]`);
+    if (selectedTheme) {
+        selectedTheme.classList.add('selected');
+    }
+    
+    // 自定义颜色
+    document.getElementById('primaryColor').value = themes.primaryColor || '#0078d4';
+    document.getElementById('accentColor').value = themes.accentColor || '#ff8c00';
+    document.getElementById('backgroundColor').value = themes.backgroundColor || '#f3f3f3';
+    document.getElementById('textColor').value = themes.textColor || '#323130';
+    
+    // 界面设置
+    document.getElementById('fontSizeSetting').value = themes.fontSize || 'medium';
+    document.getElementById('uiDensitySetting').value = themes.uiDensity || 'comfortable';
+    document.getElementById('enableAnimations').checked = themes.enableAnimations !== false;
+    document.getElementById('enableTransitions').checked = themes.enableTransitions !== false;
+    document.getElementById('enableShadows').checked = themes.enableShadows !== false;
+}
+
+function selectTheme(theme) {
+    // 更新选中状态
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    const selectedOption = document.querySelector(`.theme-option[onclick="selectTheme('${theme}')"]`);
+    if (selectedOption) {
+        selectedOption.classList.add('selected');
+    }
+    
+    // 应用主题
+    applyTheme(theme);
+}
+
+async function saveThemes(event) {
+    event.preventDefault();
+    
+    const themes = {
+        theme: document.querySelector('.theme-option.selected')?.getAttribute('onclick')?.match(/'([^']+)'/)?.[1] || 'light',
+        primaryColor: document.getElementById('primaryColor').value,
+        accentColor: document.getElementById('accentColor').value,
+        backgroundColor: document.getElementById('backgroundColor').value,
+        textColor: document.getElementById('textColor').value,
+        fontSize: document.getElementById('fontSizeSetting').value,
+        uiDensity: document.getElementById('uiDensitySetting').value,
+        enableAnimations: document.getElementById('enableAnimations').checked,
+        enableTransitions: document.getElementById('enableTransitions').checked,
+        enableShadows: document.getElementById('enableShadows').checked
+    };
+    
+    // 保存到localStorage
+    localStorage.setItem('appThemes', JSON.stringify(themes));
+    
+    // 应用自定义颜色
+    if (themes.primaryColor) {
+        document.documentElement.style.setProperty('--windows-blue', themes.primaryColor);
+    }
+    if (themes.backgroundColor) {
+        document.documentElement.style.setProperty('--windows-bg', themes.backgroundColor);
+    }
+    if (themes.textColor) {
+        document.documentElement.style.setProperty('--windows-text', themes.textColor);
+    }
+    
+    // 应用字体大小
+    applyFontSize(themes.fontSize);
+    
+    // 应用界面密度
+    applyUIDensity(themes.uiDensity);
+    
+    hideThemesModal();
+    showNotification('主题已保存');
+}
+
+function applyFontSize(size) {
+    const root = document.documentElement;
+    const sizes = {
+        small: '14px',
+        medium: '16px',
+        large: '18px',
+        'extra-large': '20px'
+    };
+    
+    root.style.fontSize = sizes[size] || '16px';
+}
+
+function applyUIDensity(density) {
+    const body = document.body;
+    body.classList.remove('ui-density-compact', 'ui-density-comfortable', 'ui-density-spacious');
+    body.classList.add(`ui-density-${density}`);
+}
+
+function resetToDefaultTheme() {
+    // 重置为默认主题
+    selectTheme('light');
+    
+    // 重置颜色
+    document.getElementById('primaryColor').value = '#0078d4';
+    document.getElementById('accentColor').value = '#ff8c00';
+    document.getElementById('backgroundColor').value = '#f3f3f3';
+    document.getElementById('textColor').value = '#323130';
+    
+    // 重置界面设置
+    document.getElementById('fontSizeSetting').value = 'medium';
+    document.getElementById('uiDensitySetting').value = 'comfortable';
+    document.getElementById('enableAnimations').checked = true;
+    document.getElementById('enableTransitions').checked = true;
+    document.getElementById('enableShadows').checked = true;
+    
+    showNotification('已恢复默认主题');
+}
+
+// 通知设置相关功能
+function showNotificationsModal() {
+    const modal = document.getElementById('notificationsModal');
+    modal.classList.add('show');
+    loadNotifications();
+    checkNotificationPermission();
+    
+    // 触发内容动画
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+function hideNotificationsModal() {
+    const modal = document.getElementById('notificationsModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // 先隐藏内容
+    if (content) {
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+    }
+    
+    // 延迟隐藏模态框
+    setTimeout(() => {
+        modal.classList.remove('show');
+    }, 300);
+}
+
+function loadNotifications() {
+    // 从localStorage加载通知设置
+    const notifications = JSON.parse(localStorage.getItem('appNotifications') || '{}');
+    
+    // 任务提醒
+    document.getElementById('taskDueReminder').checked = notifications.taskDueReminder !== false;
+    document.getElementById('importantTaskReminder').checked = notifications.importantTaskReminder !== false;
+    document.getElementById('dailyTaskSummary').checked = notifications.dailyTaskSummary || false;
+    document.getElementById('weeklyTaskReport').checked = notifications.weeklyTaskReport || false;
+    document.getElementById('reminderTime').value = notifications.reminderTime || '30';
+    
+    // 声音设置
+    document.getElementById('enableSoundReminder').checked = notifications.enableSoundReminder !== false;
+    document.getElementById('enableVibration').checked = notifications.enableVibration || false;
+    document.getElementById('reminderVolume').value = notifications.reminderVolume || 70;
+    document.getElementById('reminderSound').value = notifications.reminderSound || 'default';
+    
+    // 桌面通知
+    document.getElementById('enableDesktopNotification').checked = notifications.enableDesktopNotification !== false;
+    document.getElementById('showTaskDetails').checked = notifications.showTaskDetails !== false;
+    document.getElementById('autoDismissNotification').checked = notifications.autoDismissNotification !== false;
+    
+    // 更新音量显示
+    updateVolumeDisplay();
+}
+
+async function saveNotifications(event) {
+    event.preventDefault();
+    
+    const notifications = {
+        taskDueReminder: document.getElementById('taskDueReminder').checked,
+        importantTaskReminder: document.getElementById('importantTaskReminder').checked,
+        dailyTaskSummary: document.getElementById('dailyTaskSummary').checked,
+        weeklyTaskReport: document.getElementById('weeklyTaskReport').checked,
+        reminderTime: document.getElementById('reminderTime').value,
+        enableSoundReminder: document.getElementById('enableSoundReminder').checked,
+        enableVibration: document.getElementById('enableVibration').checked,
+        reminderVolume: document.getElementById('reminderVolume').value,
+        reminderSound: document.getElementById('reminderSound').value,
+        enableDesktopNotification: document.getElementById('enableDesktopNotification').checked,
+        showTaskDetails: document.getElementById('showTaskDetails').checked,
+        autoDismissNotification: document.getElementById('autoDismissNotification').checked
+    };
+    
+    // 保存到localStorage
+    localStorage.setItem('appNotifications', JSON.stringify(notifications));
+    
+    hideNotificationsModal();
+    showNotification('通知设置已保存');
+}
+
+function updateVolumeDisplay() {
+    const volume = document.getElementById('reminderVolume').value;
+    document.getElementById('volumeValue').textContent = volume + '%';
+}
+
+function requestNotificationPermission() {
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            updateNotificationStatus(permission);
+            
+            if (permission === 'granted') {
+                showNotification('通知权限已授予', 'success');
+            } else if (permission === 'denied') {
+                showNotification('通知权限被拒绝', 'error');
+            } else {
+                showNotification('通知权限未设置', 'info');
+            }
+        });
+    } else {
+        showNotification('浏览器不支持桌面通知', 'error');
+    }
+}
+
+function updateNotificationStatus(permission) {
+    const statusElement = document.getElementById('notificationStatus');
+    const statusText = {
+        granted: '已授权',
+        denied: '已拒绝',
+        default: '未设置'
+    };
+    
+    statusElement.textContent = statusText[permission] || '未设置';
+    
+    // 更新样式
+    statusElement.className = 'text-sm px-2 py-1 rounded';
+    if (permission === 'granted') {
+        statusElement.classList.add('bg-green-100', 'text-green-800');
+    } else if (permission === 'denied') {
+        statusElement.classList.add('bg-red-100', 'text-red-800');
+    } else {
+        statusElement.classList.add('bg-gray-200');
+    }
+}
+
+function testNotification() {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('测试通知', {
+            body: '这是一个测试通知，用于验证通知功能是否正常工作。',
+            icon: '/static/icons/icon-192.png',
+            tag: 'test-notification'
+        });
+        
+        // 自动关闭
+        setTimeout(() => {
+            notification.close();
+        }, 3000);
+        
+        showNotification('测试通知已发送', 'success');
+    } else {
+        showNotification('请先授予通知权限', 'error');
+    }
+}
+
+// 快捷键相关功能
+function showShortcutsModal() {
+    const modal = document.getElementById('shortcutsModal');
+    modal.classList.add('show');
+    loadShortcuts();
+    
+    // 触发内容动画
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+function hideShortcutsModal() {
+    const modal = document.getElementById('shortcutsModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // 先隐藏内容
+    if (content) {
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+    }
+    
+    // 延迟隐藏模态框
+    setTimeout(() => {
+        modal.classList.remove('show');
+    }, 300);
+}
+
+function loadShortcuts() {
+    // 从localStorage加载快捷键设置
+    const shortcuts = JSON.parse(localStorage.getItem('appShortcuts') || '{}');
+    
+    // 加载自定义快捷键列表
+    renderCustomShortcuts(shortcuts.custom || []);
+}
+
+function renderCustomShortcuts(customShortcuts) {
+    const container = document.getElementById('customShortcutsList');
+    container.innerHTML = '';
+    
+    customShortcuts.forEach((shortcut, index) => {
+        const shortcutItem = document.createElement('div');
+        shortcutItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+        shortcutItem.innerHTML = `
+            <div class="flex-1">
+                <div class="font-medium text-sm">${shortcut.action}</div>
+                <div class="text-xs text-gray-500">${shortcut.key}</div>
+            </div>
+            <button type="button" onclick="removeCustomShortcut(${index})" class="text-red-500 hover:text-red-700">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        container.appendChild(shortcutItem);
+    });
+}
+
+function recordShortcut() {
+    const actionSelect = document.getElementById('customAction');
+    const shortcutInput = document.getElementById('customShortcut');
+    
+    if (!actionSelect.value) {
+        showNotification('请先选择一个操作', 'error');
+        return;
+    }
+    
+    // 开始录制
+    shortcutInput.value = '按下快捷键...';
+    shortcutInput.style.background = '#fef3c7';
+    
+    const handleKeyDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 构建快捷键字符串
+        let keyString = '';
+        if (e.ctrlKey) keyString += 'Ctrl+';
+        if (e.altKey) keyString += 'Alt+';
+        if (e.shiftKey) keyString += 'Shift+';
+        
+        // 处理特殊键
+        if (e.key === ' ') {
+            keyString += 'Space';
+        } else if (e.key.length === 1) {
+            keyString += e.key.toUpperCase();
+        } else {
+            keyString += e.key;
+        }
+        
+        shortcutInput.value = keyString;
+        shortcutInput.style.background = '#ffffff';
+        
+        // 移除事件监听器
+        document.removeEventListener('keydown', handleKeyDown, true);
+    };
+    
+    // 添加事件监听器
+    document.addEventListener('keydown', handleKeyDown, true);
+    
+    // 5秒后自动停止录制
+    setTimeout(() => {
+        document.removeEventListener('keydown', handleKeyDown, true);
+        if (shortcutInput.value === '按下快捷键...') {
+            shortcutInput.value = '';
+            shortcutInput.style.background = '#ffffff';
+        }
+    }, 5000);
+}
+
+function addCustomShortcut() {
+    const actionSelect = document.getElementById('customAction');
+    const shortcutInput = document.getElementById('customShortcut');
+    
+    if (!actionSelect.value || !shortcutInput.value) {
+        showNotification('请选择操作并设置快捷键', 'error');
+        return;
+    }
+    
+    // 检查快捷键冲突
+    if (checkShortcutConflict(shortcutInput.value)) {
+        showNotification('快捷键冲突，请选择其他组合键', 'error');
+        return;
+    }
+    
+    // 获取现有快捷键
+    const shortcuts = JSON.parse(localStorage.getItem('appShortcuts') || '{}');
+    const customShortcuts = shortcuts.custom || [];
+    
+    // 添加新快捷键
+    customShortcuts.push({
+        action: actionSelect.options[actionSelect.selectedIndex].text,
+        key: shortcutInput.value
+    });
+    
+    shortcuts.custom = customShortcuts;
+    localStorage.setItem('appShortcuts', JSON.stringify(shortcuts));
+    
+    // 清空表单
+    actionSelect.value = '';
+    shortcutInput.value = '';
+    
+    // 重新渲染列表
+    renderCustomShortcuts(customShortcuts);
+    
+    showNotification('快捷键已添加');
+}
+
+function removeCustomShortcut(index) {
+    const shortcuts = JSON.parse(localStorage.getItem('appShortcuts') || '{}');
+    const customShortcuts = shortcuts.custom || [];
+    
+    customShortcuts.splice(index, 1);
+    shortcuts.custom = customShortcuts;
+    
+    localStorage.setItem('appShortcuts', JSON.stringify(shortcuts));
+    renderCustomShortcuts(customShortcuts);
+    
+    showNotification('快捷键已删除');
+}
+
+function checkShortcutConflict(newShortcut) {
+    // 这里可以实现快捷键冲突检查逻辑
+    // 暂时返回false，表示无冲突
+    return false;
+}
+
+function resetToDefaultShortcuts() {
+    localStorage.removeItem('appShortcuts');
+    renderCustomShortcuts([]);
+    showNotification('已恢复默认快捷键');
+}
+
+async function saveShortcuts(event) {
+    event.preventDefault();
+    
+    // 添加当前录制的快捷键
+    const shortcutInput = document.getElementById('customShortcut');
+    if (shortcutInput.value && shortcutInput.value !== '按下快捷键...') {
+        addCustomShortcut();
+    }
+    
+    hideShortcutsModal();
+    showNotification('快捷键设置已保存');
+}
+
 // AI配置相关功能
 function showAIConfigModal() {
     const modal = document.getElementById('aiConfigModal');
-    loadAIConfig();
-    
-    // 显示模态框
     modal.classList.add('show');
+    loadAIConfig();
     
     // 触发内容动画
     setTimeout(() => {
@@ -2663,3 +3357,787 @@ async function updateTaskTime(taskId, newDate, newHour) {
         showNotification('更新任务时间失败', 'error');
     }
 }
+
+// PWA智能安装提示功能
+let deferredPrompt = null;
+let installButton;
+let pwaInstallModal = null;
+let pwaInstallSupported = false;
+
+// 监听beforeinstallprompt事件
+window.addEventListener('beforeinstallprompt', (e) => {
+    // 阻止默认的安装横幅
+    e.preventDefault();
+    // 保存事件以便后续触发
+    deferredPrompt = e;
+    pwaInstallSupported = true;
+    console.log('PWA安装提示已准备，可以安装应用');
+    
+    // 显示安装提示按钮（如果有的话）
+    if (installButton) {
+        installButton.style.display = 'block';
+    }
+});
+
+// 监听PWA安装成功事件
+window.addEventListener('appinstalled', (evt) => {
+    console.log('PWA应用已成功安装');
+    deferredPrompt = null;
+    pwaInstallSupported = false;
+    showNotification('应用安装成功！感谢您的支持 🎉');
+    
+    // 关闭任何打开的安装模态框
+    if (pwaInstallModal) {
+        closePWAInstallModal();
+    }
+});
+
+// 检查是否应该显示PWA安装提示
+async function checkPWAInstallPrompt() {
+    try {
+        // 获取用户偏好设置
+        const response = await fetch('/api/user_preferences');
+        const preferences = await response.json();
+        
+        // 如果用户已经选择不再显示，则不提示
+        if (preferences.pwa_install_dismissed) {
+            console.log('用户已选择不再显示PWA安装提示');
+            return;
+        }
+        
+        // 检查是否在移动端
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (!isMobile) {
+            console.log('非移动端，不显示PWA安装提示');
+            return;
+        }
+        
+        // 检查是否已经安装
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('PWA已安装，不显示提示');
+            return;
+        }
+        
+        // 延迟3秒后显示提示，避免影响页面加载
+        setTimeout(() => {
+            showPWAInstallModal();
+        }, 3000);
+        
+    } catch (error) {
+        console.error('检查PWA安装提示失败:', error);
+    }
+}
+
+// 显示PWA安装提示模态框
+function showPWAInstallModal() {
+    // 如果已经显示，则不再显示
+    if (pwaInstallModal) {
+        return;
+    }
+    
+    // 创建模态框
+    pwaInstallModal = document.createElement('div');
+    pwaInstallModal.className = 'pwa-install-modal';
+    pwaInstallModal.innerHTML = `
+        <div class="pwa-install-backdrop" onclick="closePWAInstallModal()"></div>
+        <div class="pwa-install-content">
+            <div class="pwa-install-header">
+                <div class="pwa-install-icon">📱</div>
+                <div class="pwa-install-title">安装应用到手机</div>
+                <button class="pwa-install-close" onclick="closePWAInstallModal()">×</button>
+            </div>
+            <div class="pwa-install-body">
+                <div class="pwa-install-description">
+                    将Microsoft To Do安装到您的手机桌面，享受更便捷的使用体验！
+                </div>
+                <div class="pwa-install-features">
+                    <div class="pwa-feature">
+                        <i class="fas fa-bolt"></i>
+                        <span>快速启动</span>
+                    </div>
+                    <div class="pwa-feature">
+                        <i class="fas fa-wifi"></i>
+                        <span>离线使用</span>
+                    </div>
+                    <div class="pwa-feature">
+                        <i class="fas fa-bell"></i>
+                        <span>推送通知</span>
+                    </div>
+                </div>
+                <div class="pwa-install-actions">
+                    <button class="pwa-install-btn-primary" onclick="installPWA()">
+                        <i class="fas fa-download"></i>
+                        立即安装
+                    </button>
+                    <button class="pwa-install-btn-secondary" onclick="dismissPWAInstall()">
+                        不再显示
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .pwa-install-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .pwa-install-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .pwa-install-content {
+            position: relative;
+            background: white;
+            border-radius: 16px;
+            padding: 0;
+            max-width: 320px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.4s ease;
+            margin: 20px;
+        }
+        
+        .pwa-install-header {
+            display: flex;
+            align-items: center;
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+        }
+        
+        .pwa-install-icon {
+            font-size: 32px;
+            margin-right: 12px;
+        }
+        
+        .pwa-install-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+        
+        .pwa-install-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #666;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .pwa-install-close:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .pwa-install-body {
+            padding: 20px;
+        }
+        
+        .pwa-install-description {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .pwa-install-features {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 24px;
+        }
+        
+        .pwa-feature {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            flex: 1;
+        }
+        
+        .pwa-feature i {
+            font-size: 20px;
+            color: #0078d4;
+            margin-bottom: 8px;
+        }
+        
+        .pwa-feature span {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .pwa-install-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .pwa-install-btn-primary {
+            flex: 2;
+            background: linear-gradient(135deg, #0078d4, #005a9e);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .pwa-install-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 120, 212, 0.3);
+        }
+        
+        .pwa-install-btn-secondary {
+            flex: 1;
+            background: #f8f9fa;
+            color: #666;
+            border: 1px solid #e9ecef;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pwa-install-btn-secondary:hover {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(30px) scale(0.9);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .pwa-install-content {
+                margin: 16px;
+                width: 95%;
+            }
+            
+            .pwa-install-header {
+                padding: 16px 16px 12px;
+            }
+            
+            .pwa-install-body {
+                padding: 16px;
+            }
+            
+            .pwa-install-features {
+                margin-bottom: 20px;
+            }
+            
+            .pwa-install-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .pwa-install-btn-primary,
+            .pwa-install-btn-secondary {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(pwaInstallModal);
+    
+    // 添加动画类
+    setTimeout(() => {
+        pwaInstallModal.classList.add('show');
+    }, 100);
+}
+
+// 关闭PWA安装提示模态框
+function closePWAInstallModal() {
+    if (pwaInstallModal) {
+        pwaInstallModal.classList.add('closing');
+        
+        setTimeout(() => {
+            if (pwaInstallModal) {
+                pwaInstallModal.remove();
+                pwaInstallModal = null;
+            }
+        }, 300);
+    }
+}
+
+// 安装PWA
+async function installPWA() {
+    console.log('开始PWA安装流程...');
+    console.log('deferredPrompt状态:', !!deferredPrompt);
+    console.log('PWA支持状态:', pwaInstallSupported);
+    
+    if (deferredPrompt && pwaInstallSupported) {
+        try {
+            console.log('显示原生PWA安装提示...');
+            // 显示安装提示
+            deferredPrompt.prompt();
+            
+            // 等待用户响应
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`用户响应PWA安装提示: ${outcome}`);
+            
+            if (outcome === 'accepted') {
+                showNotification('应用安装成功！感谢您的支持 🎉');
+                closePWAInstallModal();
+            } else {
+                console.log('用户取消了PWA安装');
+                showNotification('安装已取消', 'info');
+            }
+            
+            deferredPrompt = null;
+            
+        } catch (error) {
+            console.error('PWA安装失败:', error);
+            showNotification('安装失败，请重试', 'error');
+        }
+    } else {
+        // 如果没有deferredPrompt，提供手动安装指导
+        console.log('使用手动安装指导...');
+        showPWAInstallGuide();
+    }
+}
+
+// 显示PWA安装指导
+function showPWAInstallGuide() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    let instructions = '';
+    
+    if (/android/i.test(userAgent)) {
+        instructions = `
+            <div style="text-align: left; padding: 16px;">
+                <h4 style="margin: 0 0 12px 0; color: #333;">Android 安装步骤：</h4>
+                <ol style="margin: 0; padding-left: 20px; color: #666; line-height: 1.6;">
+                    <li style="margin-bottom: 8px;">点击浏览器菜单（右上角三个点）</li>
+                    <li style="margin-bottom: 8px;">选择"添加到主屏幕"或"安装应用"</li>
+                    <li style="margin-bottom: 8px;">确认安装到主屏幕</li>
+                </ol>
+            </div>
+        `;
+    } else if (/iphone|ipad|ipod/i.test(userAgent)) {
+        instructions = `
+            <div style="text-align: left; padding: 16px;">
+                <h4 style="margin: 0 0 12px 0; color: #333;">iOS 安装步骤：</h4>
+                <ol style="margin: 0; padding-left: 20px; color: #666; line-height: 1.6;">
+                    <li style="margin-bottom: 8px;">点击底部分享按钮</li>
+                    <li style="margin-bottom: 8px;">向下滑动，找到"添加到主屏幕"</li>
+                    <li style="margin-bottom: 8px;">点击"添加"确认安装</li>
+                </ol>
+            </div>
+        `;
+    } else {
+        instructions = `
+            <div style="text-align: left; padding: 16px;">
+                <h4 style="margin: 0 0 12px 0; color: #333;">安装步骤：</h4>
+                <p style="margin: 0; color: #666; line-height: 1.6;">
+                    请查找浏览器菜单中的"安装应用"或"添加到主屏幕"选项。
+                </p>
+            </div>
+        `;
+    }
+    
+    // 更新模态框内容
+    const content = pwaInstallModal.querySelector('.pwa-install-body');
+    if (content) {
+        content.innerHTML = instructions + `
+            <div style="padding: 16px; text-align: center;">
+                <button class="pwa-install-btn-primary" onclick="closePWAInstallModal()" style="width: 100%;">
+                    我知道了
+                </button>
+            </div>
+        `;
+    }
+}
+
+// 用户选择不再显示PWA安装提示
+async function dismissPWAInstall() {
+    try {
+        // 更新用户偏好设置
+        const response = await fetch('/api/user_preferences', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                pwa_install_dismissed: true
+            })
+        });
+        
+        if (response.ok) {
+            console.log('用户选择不再显示PWA安装提示');
+            closePWAInstallModal();
+            showNotification('已记录您的选择，将不再显示安装提示');
+        } else {
+            throw new Error('更新设置失败');
+        }
+    } catch (error) {
+        console.error('更新PWA安装提示设置失败:', error);
+        showNotification('设置失败，请重试', 'error');
+    }
+}
+
+// 显示安装应用对话框
+function showInstallAppDialog() {
+    // 如果支持PWA安装提示，直接触发
+    if (deferredPrompt) {
+        installPWA();
+        return;
+    }
+    
+    // 否则显示安装指导
+    const modal = document.createElement('div');
+    modal.className = 'modal show';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">安装应用到手机</h2>
+                <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">将Microsoft To Do安装到您的手机桌面，享受更便捷的使用体验！</p>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 class="font-semibold text-blue-800 mb-2">
+                        <i class="fas fa-bolt mr-2"></i>快速启动
+                    </h3>
+                    <p class="text-blue-700 text-sm">从桌面直接打开应用，无需浏览器</p>
+                </div>
+                
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <h3 class="font-semibold text-green-800 mb-2">
+                        <i class="fas fa-wifi mr-2"></i>离线使用
+                    </h3>
+                    <p class="text-green-700 text-sm">无网络时也能正常使用核心功能</p>
+                </div>
+                
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h3 class="font-semibold text-purple-800 mb-2">
+                        <i class="fas fa-bell mr-2"></i>推送通知
+                    </h3>
+                    <p class="text-purple-700 text-sm">及时接收任务提醒和更新</p>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button onclick="this.parentElement.parentElement.parentElement.remove()" class="windows-button-secondary px-4 py-2">
+                    稍后安装
+                </button>
+                <button onclick="installPWA(); this.parentElement.parentElement.parentElement.remove();" class="windows-button px-4 py-2">
+                    <i class="fas fa-download mr-2"></i>立即安装
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // 添加动画类
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+// 显示关于对话框
+function showAboutDialog() {
+    showNotification('Microsoft To Do - 版本 1.0.0\n一个现代化的任务管理应用\n支持PWA离线使用和AI智能助手', 'info');
+}
+
+// 删除账户相关功能
+function showDeleteAccountDialog() {
+    toggleUserMenu(); // 关闭用户菜单
+    
+    const modal = document.getElementById('deleteAccountModal');
+    modal.classList.add('show');
+    
+    // 加载用户数据摘要
+    loadUserDataSummary();
+    
+    // 触发内容动画
+    setTimeout(() => {
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }
+    }, 50);
+}
+
+function hideDeleteAccountDialog() {
+    const modal = document.getElementById('deleteAccountModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // 先隐藏内容
+    if (content) {
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+    }
+    
+    // 延迟隐藏模态框
+    setTimeout(() => {
+        modal.classList.remove('show');
+        // 清空表单
+        document.getElementById('deleteAccountForm').reset();
+        document.getElementById('deleteConfirmation').value = '';
+        document.getElementById('deletePassword').value = '';
+    }, 300);
+}
+
+async function loadUserDataSummary() {
+    const summaryDiv = document.getElementById('userDataSummary');
+    
+    try {
+        // 获取用户统计数据
+        const [statsResponse, listsResponse, tasksResponse] = await Promise.all([
+            fetch('/api/stats'),
+            fetch('/api/task_lists'),
+            fetch('/api/tasks?show_completed=true')
+        ]);
+        
+        const stats = await statsResponse.json();
+        const lists = await listsResponse.json();
+        const tasks = await tasksResponse.json();
+        
+        // 计算数据摘要
+        const totalTasks = stats.total_tasks || 0;
+        const completedTasks = stats.completed_tasks || 0;
+        const pendingTasks = stats.pending_tasks || 0;
+        const totalLists = lists.length || 0;
+        const importantTasks = tasks.filter(t => t.is_important && !t.completed).length || 0;
+        const todayTasks = tasks.filter(t => {
+            const today = new Date().toISOString().split('T')[0];
+            return t.due_date === today && !t.completed;
+        }).length || 0;
+        const overdueTasks = tasks.filter(t => {
+            return t.due_date && new Date(t.due_date) < new Date() && !t.completed;
+        }).length || 0;
+        
+        // 显示数据摘要
+        summaryDiv.innerHTML = `
+            <div class="text-sm text-gray-600">
+                <h4 class="font-semibold text-gray-800 mb-3">您的数据摘要：</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-blue-50 p-3 rounded">
+                        <div class="text-blue-800 font-medium">${totalTasks}</div>
+                        <div class="text-blue-600 text-xs">总任务数</div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded">
+                        <div class="text-green-800 font-medium">${completedTasks}</div>
+                        <div class="text-green-600 text-xs">已完成</div>
+                    </div>
+                    <div class="bg-orange-50 p-3 rounded">
+                        <div class="text-orange-800 font-medium">${pendingTasks}</div>
+                        <div class="text-orange-600 text-xs">待完成</div>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded">
+                        <div class="text-purple-800 font-medium">${totalLists}</div>
+                        <div class="text-purple-600 text-xs">任务列表</div>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded">
+                        <div class="text-red-800 font-medium">${importantTasks}</div>
+                        <div class="text-red-600 text-xs">重要任务</div>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded">
+                        <div class="text-yellow-800 font-medium">${todayTasks}</div>
+                        <div class="text-yellow-600 text-xs">今日到期</div>
+                    </div>
+                </div>
+                ${overdueTasks > 0 ? `
+                    <div class="mt-3 bg-red-100 border border-red-200 p-3 rounded">
+                        <div class="text-red-800 font-medium">${overdueTasks}</div>
+                        <div class="text-red-600 text-xs">逾期任务</div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('加载用户数据摘要失败:', error);
+        summaryDiv.innerHTML = `
+            <div class="text-sm text-red-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                无法加载数据摘要，请检查网络连接
+            </div>
+        `;
+    }
+}
+
+async function confirmDeleteAccount(event) {
+    event.preventDefault();
+    
+    const confirmation = document.getElementById('deleteConfirmation').value.trim();
+    const password = document.getElementById('deletePassword').value;
+    
+    // 验证确认文本
+    if (confirmation !== '删除我的账户') {
+        showNotification('请输入正确的确认文本：删除我的账户', 'error');
+        return;
+    }
+    
+    // 验证密码
+    if (!password) {
+        showNotification('请输入密码以验证身份', 'error');
+        return;
+    }
+    
+    // 再次确认
+    if (!confirm('⚠️ 最后确认：\n\n删除账户将永久清除所有数据，包括：\n• 所有任务和任务列表\n• 用户偏好设置\n• 登录会话记录\n• 所有相关数据\n\n此操作无法撤销，确定要继续吗？')) {
+        return;
+    }
+    
+    try {
+        // 显示处理状态
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>正在删除...';
+        submitBtn.disabled = true;
+        
+        // 发送删除请求
+        const response = await fetch('/api/user/delete-account', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showNotification('账户删除成功，即将跳转到登录页面...', 'success');
+            
+            // 清除本地存储
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // 延迟跳转，让用户看到成功消息
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+            
+        } else {
+            throw new Error(data.error || '删除账户失败');
+        }
+        
+    } catch (error) {
+        console.error('删除账户失败:', error);
+        
+        // 恢复按钮状态
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>确认删除账户';
+        submitBtn.disabled = false;
+        
+        // 显示错误信息
+        let errorMessage = '删除账户失败';
+        if (error.message) {
+            if (error.message.includes('密码')) {
+                errorMessage = '密码错误，请重新输入';
+            } else if (error.message.includes('网络')) {
+                errorMessage = '网络连接失败，请检查网络后重试';
+            } else if (error.message.includes('权限')) {
+                errorMessage = '权限不足，请重新登录后重试';
+            } else {
+                errorMessage = error.message;
+            }
+        }
+        
+        showNotification(errorMessage, 'error');
+        
+        // 如果是密码错误，清空密码字段
+        if (error.message && error.message.includes('密码')) {
+            document.getElementById('deletePassword').value = '';
+            document.getElementById('deletePassword').focus();
+        }
+    }
+}
+
+// 点击外部关闭删除账户模态框
+document.addEventListener('click', function(event) {
+    const deleteModal = document.getElementById('deleteAccountModal');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const mobileUserMenuBtn = document.getElementById('mobileUserMenuBtn');
+    const userMenu = document.getElementById('userMenu');
+    
+    // 检查是否点击了删除账户模态框外部
+    if (deleteModal && deleteModal.classList.contains('show') && 
+        !deleteModal.contains(event.target) && 
+        !userMenuBtn.contains(event.target) &&
+        !mobileUserMenuBtn.contains(event.target) &&
+        !userMenu.contains(event.target)) {
+        
+        // 检查是否点击了删除账户菜单项
+        const deleteMenuItem = event.target.closest('a[onclick*="showDeleteAccountDialog"]');
+        if (!deleteMenuItem) {
+            hideDeleteAccountDialog();
+        }
+    }
+});
+
+// 检查是否已安装
+window.addEventListener('appinstalled', () => {
+    console.log('PWA已安装');
+    if (pwaInstallModal) {
+        closePWAInstallModal();
+    }
+    showNotification('应用安装成功！感谢您的支持 🎉');
+});

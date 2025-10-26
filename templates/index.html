@@ -2,10 +2,15 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Microsoft To Do</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0078d4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Microsoft To Do">
     <style>
         /* Windows 11 风格的自定义样式 */
         :root {
@@ -797,6 +802,218 @@
 
         [data-theme="dark"] .toggle-checkbox::before {
             background: white;
+        }
+
+        /* 主题预览样式 */
+        .theme-option {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+        }
+
+        .theme-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .theme-option.selected {
+            border-color: var(--windows-blue);
+            background: rgba(0, 120, 212, 0.1);
+        }
+
+        .theme-preview {
+            width: 100px;
+            height: 60px;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .theme-preview .theme-header {
+            height: 20px;
+            background: var(--windows-surface);
+            border-bottom: 1px solid var(--windows-border);
+        }
+
+        .theme-preview .theme-content {
+            height: 40px;
+            background: var(--windows-bg);
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+        }
+
+        .theme-preview .theme-card {
+            flex: 1;
+            background: var(--windows-surface);
+            border-radius: 2px;
+            border: 1px solid var(--windows-border);
+        }
+
+        /* 浅色主题预览 */
+        .light-theme .theme-header {
+            background: #ffffff;
+            border-color: #e1e1e1;
+        }
+
+        .light-theme .theme-content {
+            background: #f3f3f3;
+        }
+
+        .light-theme .theme-card {
+            background: #ffffff;
+            border-color: #e1e1e1;
+        }
+
+        /* 深色主题预览 */
+        .dark-theme .theme-header {
+            background: #2d2d2d;
+            border-color: #404040;
+        }
+
+        .dark-theme .theme-content {
+            background: #202020;
+        }
+
+        .dark-theme .theme-card {
+            background: #2d2d2d;
+            border-color: #404040;
+        }
+
+        /* 自动主题预览 */
+        .auto-theme .theme-header {
+            background: linear-gradient(90deg, #ffffff 50%, #2d2d2d 50%);
+            border-color: #e1e1e1;
+        }
+
+        .auto-theme .theme-content {
+            background: linear-gradient(90deg, #f3f3f3 50%, #202020 50%);
+        }
+
+        .half-light {
+            background: linear-gradient(90deg, #ffffff 50%, #2d2d2d 50%);
+        }
+
+        .half-dark {
+            background: linear-gradient(90deg, #f3f3f3 50%, #202020 50%);
+        }
+
+        .auto-theme .theme-card {
+            background: linear-gradient(90deg, #ffffff 50%, #2d2d2d 50%);
+            border-color: #e1e1e1;
+        }
+
+        /* 快捷键样式 */
+        .kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 11px;
+            line-height: 1;
+            color: #374151;
+            vertical-align: middle;
+            background-color: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            box-shadow: inset 0 -1px 0 #d1d5db;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        [data-theme="dark"] .kbd {
+            color: #e5e7eb;
+            background-color: #374151;
+            border-color: #4b5563;
+            box-shadow: inset 0 -1px 0 #4b5563;
+        }
+
+        /* 音量滑块样式 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-track {
+            background: var(--windows-border);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--windows-blue);
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            margin-top: -6px;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-track {
+            background: var(--windows-border);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            background: var(--windows-blue);
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* 颜色选择器样式 */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid var(--windows-border);
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 3px;
+        }
+
+        /* 深色主题下的快捷键 */
+        [data-theme="dark"] .kbd {
+            color: #e5e7eb;
+            background-color: #374151;
+            border-color: #4b5563;
+            box-shadow: inset 0 -1px 0 #4b5563;
+        }
+
+        /* 深色主题下的颜色选择器 */
+        [data-theme="dark"] input[type="color"] {
+            border-color: var(--windows-border);
+        }
+
+        /* 深色主题下的音量滑块 */
+        [data-theme="dark"] input[type="range"]::-webkit-slider-track {
+            background: var(--windows-border);
+        }
+
+        [data-theme="dark"] input[type="range"]::-webkit-slider-thumb {
+            background: var(--windows-blue);
+        }
+
+        [data-theme="dark"] input[type="range"]::-moz-range-track {
+            background: var(--windows-border);
+        }
+
+        [data-theme="dark"] input[type="range"]::-moz-range-thumb {
+            background: var(--windows-blue);
         }
 
         /* 图标选择样式 */
@@ -1827,8 +2044,222 @@
             color: white;
         }
 
-        /* 响应式设计 */
+        /* 移动端响应式设计 */
         @media (max-width: 768px) {
+            /* 基础布局调整 */
+            body {
+                font-size: 16px; /* 防止iOS自动缩放 */
+            }
+
+            /* 侧边栏移动端适配 */
+            #sidebar {
+                position: fixed;
+                left: -256px;
+                top: 0;
+                height: 100vh;
+                z-index: 1001;
+                transition: left 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            }
+
+            #sidebar.mobile-open {
+                left: 0;
+            }
+
+        /* 移动端顶部导航栏 */
+        .mobile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--windows-surface);
+            border-bottom: 1px solid var(--windows-border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1002;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+            .mobile-menu-btn {
+                width: 44px;
+                height: 44px;
+                border: none;
+                background: transparent;
+                color: var(--windows-text);
+                font-size: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                transition: background-color 0.2s;
+            }
+
+            .mobile-menu-btn:hover {
+                background: rgba(0, 120, 212, 0.1);
+            }
+
+            .mobile-title {
+                font-size: 18px;
+                font-weight: 600;
+                color: var(--windows-text);
+                flex: 1;
+                text-align: center;
+            }
+
+            .mobile-user-btn {
+                width: 44px;
+                height: 44px;
+                border: none;
+                background: transparent;
+                color: var(--windows-text);
+                font-size: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background-color 0.2s;
+            }
+
+            .mobile-user-btn:hover {
+                background: rgba(0, 120, 212, 0.1);
+            }
+
+            /* 隐藏桌面端头部 */
+            header.bg-white {
+                display: none;
+            }
+
+            /* 主内容区域调整 */
+            main {
+                padding: 0;
+                background: var(--windows-bg);
+                padding-top: 60px; /* 为固定顶部栏留出空间 */
+            }
+
+            .max-w-4xl {
+                max-width: 100%;
+                padding: 16px;
+            }
+
+            /* 任务项移动端优化 */
+            .task-item {
+                padding: 16px;
+                margin-bottom: 8px;
+                border-radius: 12px;
+            }
+
+            .task-checkbox {
+                width: 24px;
+                height: 24px;
+                margin-right: 12px;
+            }
+
+            .task-title {
+                font-size: 16px;
+                line-height: 1.5;
+            }
+
+            .task-description {
+                font-size: 14px;
+                margin-top: 8px;
+            }
+
+            .task-meta {
+                margin-top: 12px;
+                gap: 8px;
+            }
+
+            .task-meta-item {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+
+            /* 任务操作按钮移动端优化 */
+            .task-actions {
+                opacity: 1;
+                position: absolute;
+                right: 16px;
+                top: 16px;
+                gap: 8px;
+            }
+
+            .task-action-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
+            }
+
+            /* 添加任务输入框移动端优化 */
+            .add-task-input {
+                font-size: 16px; /* 防止iOS自动缩放 */
+                padding: 16px;
+            }
+
+            /* 按钮移动端优化 */
+            .windows-button {
+                padding: 12px 20px;
+                font-size: 16px;
+                min-height: 44px; /* 触摸友好 */
+            }
+
+            .windows-button-secondary {
+                padding: 12px 20px;
+                font-size: 16px;
+                min-height: 44px;
+            }
+
+            /* 模态框移动端适配 */
+            .task-edit-panel {
+                width: 100%;
+                right: 0;
+                border-radius: 0;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-width: none;
+                margin: 16px;
+                padding: 20px;
+            }
+
+            /* AI助手移动端适配 */
+            .ai-assistant-panel {
+                width: 100vw;
+                height: 100vh;
+                right: 0;
+                bottom: 0;
+                border-radius: 0;
+            }
+
+            .ai-assistant-btn {
+                width: 56px;
+                height: 56px;
+                bottom: 20px;
+                right: 20px;
+            }
+
+            /* 滑动侧边栏移动端适配 */
+            .sliding-sidebar {
+                width: 100vw;
+                right: -100vw;
+            }
+
+            /* 搜索框移动端优化 */
+            .search-input {
+                font-size: 16px;
+                padding: 12px 16px 12px 44px;
+                min-height: 44px;
+            }
+
+            /* 表单元素移动端优化 */
+            input, textarea, select {
+                font-size: 16px; /* 防止iOS自动缩放 */
+                min-height: 44px;
+            }
+
+            /* 日历周视图移动端适配 */
             .calendar-week-header {
                 padding: 12px 16px;
             }
@@ -1839,7 +2270,6 @@
             }
 
             .calendar-timeline-container {
-                grid-template-columns: 60px repeat(7, 1fr);
                 min-height: 400px;
             }
 
@@ -1858,6 +2288,117 @@
 
             .calendar-grid-day {
                 min-height: 200px;
+            }
+
+            /* 遮罩层 */
+            .mobile-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+                display: none;
+            }
+
+            .mobile-overlay.show {
+                display: block;
+            }
+
+            /* 触摸优化 */
+            * {
+                -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+
+            input, textarea {
+                -webkit-user-select: text;
+                -moz-user-select: text;
+                -ms-user-select: text;
+                user-select: text;
+            }
+
+            /* 滚动优化 */
+            .overflow-y-auto {
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* 防止横向滚动 */
+            body {
+                overflow-x: hidden;
+            }
+
+            /* 底部安全区域适配 */
+            .mobile-bottom-safe {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+
+            /* 状态栏适配 */
+            .mobile-top-safe {
+                padding-top: env(safe-area-inset-top);
+            }
+        }
+
+        /* 小屏幕手机适配 */
+        @media (max-width: 480px) {
+            .max-w-4xl {
+                padding: 12px;
+            }
+
+            .task-item {
+                padding: 12px;
+            }
+
+            .task-title {
+                font-size: 15px;
+            }
+
+            .task-description {
+                font-size: 13px;
+            }
+
+            .task-actions {
+                right: 12px;
+                top: 12px;
+            }
+
+            .task-action-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 12px;
+            }
+
+            .ai-assistant-btn {
+                width: 52px;
+                height: 52px;
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+
+        /* 横屏模式适配 */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .mobile-header {
+                padding: 8px 16px;
+            }
+
+            .mobile-menu-btn,
+            .mobile-user-btn {
+                width: 40px;
+                height: 40px;
+            }
+
+            .mobile-title {
+                font-size: 16px;
+            }
+
+            .max-w-4xl {
+                padding: 12px;
             }
         }
 
@@ -2288,6 +2829,20 @@
 <body class="h-screen overflow-hidden">
     
     <div class="flex h-full">
+        <!-- 移动端顶部导航栏 -->
+        <div class="mobile-header" style="display: none;">
+            <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="mobile-title" id="mobilePageTitle">Microsoft To Do</div>
+            <button class="mobile-user-btn" onclick="toggleUserMenu()" id="mobileUserMenuBtn">
+                <i class="fas fa-user" id="mobileUserAvatar"></i>
+            </button>
+        </div>
+
+        <!-- 移动端遮罩层 -->
+        <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
+
         <!-- 侧边栏 -->
         <div class="w-64 bg-white border-r border-gray-200 flex flex-col" id="sidebar">
             <!-- 搜索框 -->
@@ -2444,6 +2999,11 @@
                                         <span>意见反馈</span>
                                         <small class="sidebar-item-desc">提交建议和问题</small>
                                     </div>
+                                    <div class="sidebar-item-slide" onclick="handleMoreAction('install_app')">
+                                        <i class="fas fa-download"></i>
+                                        <span>安装应用</span>
+                                        <small class="sidebar-item-desc">安装到手机桌面</small>
+                                    </div>
                                     <div class="sidebar-item-slide" onclick="handleMoreAction('about')">
                                         <i class="fas fa-info"></i>
                                         <span>关于应用</span>
@@ -2507,6 +3067,9 @@
                                         <i class="fas fa-cog mr-2"></i>设置
                                     </a>
                                     <div class="border-t border-gray-200"></div>
+                                    <a href="#" onclick="showDeleteAccountDialog()" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                                        <i class="fas fa-trash-alt mr-2"></i>删除账户
+                                    </a>
                                     <a href="#" onclick="logout()" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
                                         <i class="fas fa-sign-out-alt mr-2"></i>退出登录
                                     </a>
@@ -2777,6 +3340,547 @@
                     </button>
                     <button type="submit" class="windows-button px-4 py-2">
                         创建列表
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 通用设置模态框 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">通用设置</h2>
+                <button onclick="hideSettingsModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="settingsForm" onsubmit="saveSettings(event)">
+                <!-- 基本设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-cog mr-2 text-blue-500"></i>
+                        基本设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">语言设置</label>
+                            <select id="languageSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="zh-CN">简体中文</option>
+                                <option value="zh-TW">繁体中文</option>
+                                <option value="en-US">English</option>
+                                <option value="ja-JP">日本語</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">时区设置</label>
+                            <select id="timezoneSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="Asia/Shanghai">北京时间 (UTC+8)</option>
+                                <option value="Asia/Tokyo">东京时间 (UTC+9)</option>
+                                <option value="America/New_York">纽约时间 (UTC-5)</option>
+                                <option value="Europe/London">伦敦时间 (UTC+0)</option>
+                                <option value="Europe/Paris">巴黎时间 (UTC+1)</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">默认列表</label>
+                            <select id="defaultListSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="today">我的一天</option>
+                                <option value="important">重要</option>
+                                <option value="planned">已计划</option>
+                                <option value="tasks">任务</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">任务排序方式</label>
+                            <select id="taskSortSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="created">创建时间</option>
+                                <option value="due_date">截止日期</option>
+                                <option value="priority">优先级</option>
+                                <option value="title">标题字母</option>
+                                <option value="manual">手动排序</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 数据管理 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-database mr-2 text-green-500"></i>
+                        数据管理
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">自动保存间隔</label>
+                            <select id="autoSaveInterval" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="0">立即保存</option>
+                                <option value="30">30秒</option>
+                                <option value="60">1分钟</option>
+                                <option value="300">5分钟</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">数据清理设置</label>
+                            <select id="dataCleanupSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="never">从不清理</option>
+                                <option value="30">30天后清理已完成任务</option>
+                                <option value="90">90天后清理已完成任务</option>
+                                <option value="365">1年后清理已完成任务</option>
+                            </select>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="enableBackup" class="mr-2" checked>
+                                <span class="text-sm">启用自动备份</span>
+                            </label>
+                            
+                            <label class="flex items-center">
+                                <input type="checkbox" id="enableSync" class="mr-2">
+                                <span class="text-sm">启用云端同步</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideSettingsModal()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-save mr-2"></i>保存设置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 主题外观模态框 -->
+    <div id="themesModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">主题外观</h2>
+                <button onclick="hideThemesModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="themesForm" onsubmit="saveThemes(event)">
+                <!-- 预设主题 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-palette mr-2 text-purple-500"></i>
+                        预设主题
+                    </h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="theme-option" onclick="selectTheme('light')">
+                            <div class="theme-preview light-theme">
+                                <div class="theme-header"></div>
+                                <div class="theme-content">
+                                    <div class="theme-card"></div>
+                                    <div class="theme-card"></div>
+                                </div>
+                            </div>
+                            <p class="text-center mt-2 text-sm">浅色主题</p>
+                        </div>
+                        
+                        <div class="theme-option" onclick="selectTheme('dark')">
+                            <div class="theme-preview dark-theme">
+                                <div class="theme-header"></div>
+                                <div class="theme-content">
+                                    <div class="theme-card"></div>
+                                    <div class="theme-card"></div>
+                                </div>
+                            </div>
+                            <p class="text-center mt-2 text-sm">深色主题</p>
+                        </div>
+                        
+                        <div class="theme-option" onclick="selectTheme('auto')">
+                            <div class="theme-preview auto-theme">
+                                <div class="theme-header half-light half-dark"></div>
+                                <div class="theme-content">
+                                    <div class="theme-card half-light half-dark"></div>
+                                    <div class="theme-card half-light half-dark"></div>
+                                </div>
+                            </div>
+                            <p class="text-center mt-2 text-sm">跟随系统</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 自定义颜色 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-paint-brush mr-2 text-orange-500"></i>
+                        自定义颜色
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">主色调</label>
+                                <input type="color" id="primaryColor" value="#0078d4" class="w-full h-10 rounded cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">强调色</label>
+                                <input type="color" id="accentColor" value="#ff8c00" class="w-full h-10 rounded cursor-pointer">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">背景色</label>
+                                <input type="color" id="backgroundColor" value="#f3f3f3" class="w-full h-10 rounded cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">文字色</label>
+                                <input type="color" id="textColor" value="#323130" class="w-full h-10 rounded cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 界面设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-desktop mr-2 text-indigo-500"></i>
+                        界面设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">字体大小</label>
+                            <select id="fontSizeSetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="small">小</option>
+                                <option value="medium" selected>中</option>
+                                <option value="large">大</option>
+                                <option value="extra-large">特大</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">界面密度</label>
+                            <select id="uiDensitySetting" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="compact">紧凑</option>
+                                <option value="comfortable" selected>舒适</option>
+                                <option value="spacious">宽松</option>
+                            </select>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="enableAnimations" class="mr-2" checked>
+                                <span class="text-sm">启用动画效果</span>
+                            </label>
+                            
+                            <label class="flex items-center">
+                                <input type="checkbox" id="enableTransitions" class="mr-2" checked>
+                                <span class="text-sm">启用过渡效果</span>
+                            </label>
+                            
+                            <label class="flex items-center">
+                                <input type="checkbox" id="enableShadows" class="mr-2" checked>
+                                <span class="text-sm">启用阴影效果</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="resetToDefaultTheme()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                        <i class="fas fa-undo mr-2"></i>恢复默认
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-save mr-2"></i>保存主题
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 通知设置模态框 -->
+    <div id="notificationsModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">通知设置</h2>
+                <button onclick="hideNotificationsModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="notificationsForm" onsubmit="saveNotifications(event)">
+                <!-- 任务提醒 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-bell mr-2 text-yellow-500"></i>
+                        任务提醒
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">任务截止提醒</span>
+                                <input type="checkbox" id="taskDueReminder" class="toggle-checkbox" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">重要任务提醒</span>
+                                <input type="checkbox" id="importantTaskReminder" class="toggle-checkbox" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">每日任务总结</span>
+                                <input type="checkbox" id="dailyTaskSummary" class="toggle-checkbox">
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">每周任务报告</span>
+                                <input type="checkbox" id="weeklyTaskReport" class="toggle-checkbox">
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">提醒时间</label>
+                            <select id="reminderTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="0">到期时</option>
+                                <option value="15">提前15分钟</option>
+                                <option value="30" selected>提前30分钟</option>
+                                <option value="60">提前1小时</option>
+                                <option value="1440">提前1天</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 声音设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-volume-up mr-2 text-green-500"></i>
+                        声音设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">启用声音提醒</span>
+                                <input type="checkbox" id="enableSoundReminder" class="toggle-checkbox" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">振动提醒</span>
+                                <input type="checkbox" id="enableVibration" class="toggle-checkbox">
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">提醒音量</label>
+                            <input type="range" id="reminderVolume" min="0" max="100" value="70" class="w-full">
+                            <div class="flex justify-between text-xs text-gray-500">
+                                <span>静音</span>
+                                <span id="volumeValue">70%</span>
+                                <span>最大</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">提醒音效</label>
+                            <select id="reminderSound" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="default">默认提示音</option>
+                                <option value="gentle">轻柔提示音</option>
+                                <option value="urgent">紧急提示音</option>
+                                <option value="bell">铃声</option>
+                                <option value="chime">钟声</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 桌面通知 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-desktop mr-2 text-blue-500"></i>
+                        桌面通知
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-medium">桌面通知权限</span>
+                                <span id="notificationStatus" class="text-sm px-2 py-1 rounded bg-gray-200">检查中...</span>
+                            </div>
+                            <button type="button" onclick="requestNotificationPermission()" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                                <i class="fas fa-shield-alt mr-2"></i>请求通知权限
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">显示桌面通知</span>
+                                <input type="checkbox" id="enableDesktopNotification" class="toggle-checkbox" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">通知显示任务详情</span>
+                                <input type="checkbox" id="showTaskDetails" class="toggle-checkbox" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between">
+                                <span class="text-sm">通知自动消失</span>
+                                <input type="checkbox" id="autoDismissNotification" class="toggle-checkbox" checked>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="testNotification()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                        <i class="fas fa-bell mr-2"></i>测试通知
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-save mr-2"></i>保存设置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 快捷键模态框 -->
+    <div id="shortcutsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">快捷键设置</h2>
+                <button onclick="hideShortcutsModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="shortcutsForm" onsubmit="saveShortcuts(event)">
+                <!-- 全局快捷键 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-keyboard mr-2 text-red-500"></i>
+                        全局快捷键
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">新建任务</div>
+                                <div class="text-xs text-gray-500">快速创建新任务</div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">Ctrl</kbd>
+                                <span class="text-gray-400">+</span>
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">N</kbd>
+                                <button type="button" class="ml-2 text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">搜索任务</div>
+                                <div class="text-xs text-gray-500">快速搜索任务</div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">Ctrl</kbd>
+                                <span class="text-gray-400">+</span>
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">F</kbd>
+                                <button type="button" class="ml-2 text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">切换主题</div>
+                                <div class="text-xs text-gray-500">在浅色和深色主题间切换</div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">Ctrl</kbd>
+                                <span class="text-gray-400">+</span>
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">D</kbd>
+                                <button type="button" class="ml-2 text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">AI助手</div>
+                                <div class="text-xs text-gray-500">打开AI助手面板</div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">Ctrl</kbd>
+                                <span class="text-gray-400">+</span>
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs">A</kbd>
+                                <button type="button" class="ml-2 text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 自定义快捷键 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-plus-circle mr-2 text-green-500"></i>
+                        自定义快捷键
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <select id="customAction" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">选择操作...</option>
+                                <option value="toggle_completed">切换显示已完成</option>
+                                <option value="show_today">显示今天</option>
+                                <option value="show_important">显示重要任务</option>
+                                <option value="export_tasks">导出任务</option>
+                                <option value="import_tasks">导入任务</option>
+                            </select>
+                            <input type="text" 
+                                   id="customShortcut" 
+                                   placeholder="按下快捷键"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   readonly>
+                            <button type="button" onclick="recordShortcut()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                <i class="fas fa-record-vinyl"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="customShortcutsList" class="space-y-2">
+                            <!-- 动态生成的自定义快捷键列表 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 快捷键帮助 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-4 flex items-center">
+                        <i class="fas fa-question-circle mr-2 text-purple-500"></i>
+                        快捷键帮助
+                    </h3>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-medium text-sm mb-2">使用说明：</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• 点击编辑按钮可以修改现有快捷键</li>
+                            <li>• 选择操作后点击录制按钮设置新的快捷键</li>
+                            <li>• 支持的组合键：Ctrl、Alt、Shift + 字母/数字</li>
+                            <li>• 快捷键冲突时会自动提示</li>
+                            <li>• 可以随时恢复默认设置</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="resetToDefaultShortcuts()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                        <i class="fas fa-undo mr-2"></i>恢复默认
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-save mr-2"></i>保存设置
                     </button>
                 </div>
             </form>
@@ -3128,6 +4232,75 @@
     <!-- 滑动侧边栏遮罩层 -->
     <div class="sliding-sidebar-overlay" id="slidingSidebarOverlay" onclick="toggleMoreMenu()"></div>
 
+    <!-- 删除账户确认模态框 -->
+    <div id="deleteAccountModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-red-600">删除账户</h2>
+                <button onclick="hideDeleteAccountDialog()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mb-6">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-center mb-2">
+                        <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                        <h3 class="font-semibold text-red-800">警告：此操作不可恢复</h3>
+                    </div>
+                    <p class="text-red-700 text-sm">删除账户将永久删除以下所有数据：</p>
+                    <ul class="mt-2 text-sm text-red-700 space-y-1">
+                        <li>• 所有任务和任务列表</li>
+                        <li>• 用户偏好设置</li>
+                        <li>• 登录会话记录</li>
+                        <li>• 所有相关数据</li>
+                    </ul>
+                </div>
+
+                <div id="userDataSummary" class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                    <div class="text-sm text-gray-600">
+                        <div class="loading-spinner mx-auto mb-2"></div>
+                        <div class="text-center">正在加载数据摘要...</div>
+                    </div>
+                </div>
+
+                <form id="deleteAccountForm" onsubmit="confirmDeleteAccount(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            请输入 <span class="bg-gray-100 px-2 py-1 rounded text-red-600 font-mono">删除我的账户</span> 来确认删除操作
+                        </label>
+                        <input type="text" 
+                               id="deleteConfirmation" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                               placeholder="删除我的账户"
+                               required>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">请输入密码以验证身份</label>
+                        <input type="password" 
+                               id="deletePassword" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                               placeholder="请输入当前密码"
+                               required>
+                    </div>
+
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" 
+                                onclick="hideDeleteAccountDialog()"
+                                class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                            <i class="fas fa-trash-alt mr-2"></i>确认删除账户
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- 通知提示 -->
     <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden fade-in">
         <div class="flex items-center">
@@ -3137,5 +4310,228 @@
     </div>
 
     <script src="/static/js/main.js"></script>
+    
+    <!-- PWA Service Worker 注册 -->
+    <script>
+        // 注册Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(registration => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // 检查更新
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // 新版本可用，提示用户更新
+                                    showUpdateNotification();
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // 显示更新通知
+        function showUpdateNotification() {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-3';
+            notification.innerHTML = `
+                <i class="fas fa-download"></i>
+                <span>应用有新版本可用</span>
+                <button onclick="updateApp()" class="bg-white text-blue-500 px-3 py-1 rounded text-sm font-medium">
+                    更新
+                </button>
+                <button onclick="this.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            document.body.appendChild(notification);
+        }
+
+        // 更新应用
+        function updateApp() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(registration => {
+                        registration.postMessage({ type: 'SKIP_WAITING' });
+                    });
+                });
+            }
+            window.location.reload();
+        }
+
+        // PWA安装提示
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // 显示安装提示
+            setTimeout(() => {
+                showInstallPrompt();
+            }, 3000);
+        });
+
+        function showInstallPrompt() {
+            const installPrompt = document.createElement('div');
+            installPrompt.className = 'fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50 md:left-auto md:right-4 md:w-80';
+            installPrompt.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-list-check text-white text-xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900">安装Microsoft To Do</h3>
+                        <p class="text-sm text-gray-600">添加到主屏幕，获得更好的体验</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="mt-3 flex space-x-2">
+                    <button onclick="installPWA()" class="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600">
+                        安装
+                    </button>
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        稍后
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(installPrompt);
+        }
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                        showNotification('应用安装成功！');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+            
+            // 移除安装提示
+            const prompt = document.querySelector('.fixed.bottom-4');
+            if (prompt) {
+                prompt.remove();
+            }
+        }
+
+        // 监听应用安装完成
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('App was installed');
+            showNotification('应用安装成功！感谢您的使用。');
+        });
+
+        // 网络状态监听
+        function updateNetworkStatus() {
+            const isOnline = navigator.onLine;
+            const statusIndicator = document.getElementById('networkStatus');
+            
+            if (isOnline) {
+                if (statusIndicator) {
+                    statusIndicator.remove();
+                }
+                showNotification('网络连接已恢复', 'success');
+            } else {
+                if (!statusIndicator) {
+                    const indicator = document.createElement('div');
+                    indicator.id = 'networkStatus';
+                    indicator.className = 'fixed top-0 left-0 right-0 bg-orange-500 text-white text-center py-2 z-50';
+                    indicator.innerHTML = `
+                        <i class="fas fa-wifi-slash mr-2"></i>
+                        网络连接已断开，应用正在离线模式下运行
+                    `;
+                    document.body.appendChild(indicator);
+                }
+            }
+        }
+
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+
+        // 处理快捷方式启动
+        function handleShortcutLaunch() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const action = urlParams.get('action');
+            const view = urlParams.get('view');
+            
+            if (action === 'new-task') {
+                setTimeout(() => {
+                    showAddTaskModal();
+                }, 500);
+            } else if (view === 'today') {
+                setTimeout(() => {
+                    const todayList = taskLists.find(list => list.name === '我的一天');
+                    if (todayList) {
+                        navigateToList(todayList.id);
+                    }
+                }, 500);
+            } else if (action === 'ai-assistant') {
+                setTimeout(() => {
+                    toggleAIAssistant();
+                }, 500);
+            }
+        }
+
+        // 页面加载完成后处理快捷方式
+        document.addEventListener('DOMContentLoaded', () => {
+            handleShortcutLaunch();
+        });
+
+        // 添加到主屏幕的iOS支持
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
+        function showIOSInstallPrompt() {
+            if (isIOS() && !navigator.standalone) {
+                const iosPrompt = document.createElement('div');
+                iosPrompt.className = 'fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50 md:left-auto md:right-4 md:w-80';
+                iosPrompt.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-list-check text-white text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-gray-900">添加到主屏幕</h3>
+                            <p class="text-sm text-gray-600">点击分享按钮，然后选择"添加到主屏幕"</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <button onclick="this.parentElement.parentElement.remove()" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600">
+                            知道了
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(iosPrompt);
+                
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    if (iosPrompt.parentElement) {
+                        iosPrompt.remove();
+                    }
+                }, 5000);
+            }
+        }
+
+        // iOS设备显示安装提示
+        setTimeout(() => {
+            showIOSInstallPrompt();
+        }, 5000);
+    </script>
 </body>
 </html>
